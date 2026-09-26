@@ -182,3 +182,94 @@ test("a long line is cut on a word boundary and marked as cut", () => {
   assert.ok(cut.length <= 20);
   assert.ok(!cut.includes("fiv…"), `cut mid-word: ${cut}`);
 });
+
+/* ── The draft ─────────────────────────────────────────────────────────────
+   Kept in this file because the notes and the dialogue share their splitters
+   and their JSON reader, and a reader of one wants the other in view. */
+
+test("a section rewritten in one language leaves the other one alone", async () => {
+  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = MeetingNotesSchema.parse({
+    fa: { title: "عنوان", goals: ["هدف فارسی"] },
+    en: { title: "Title", goals: ["English goal"] },
+  });
+
+  // THE BUG THIS EXISTS FOR: every section's schema carries a default, so
+  // parsing `undefined` succeeds and yields the empty default. Passing one
+  // edition and leaving the other as `undefined` would erase it, silently.
+  const next = withSection(notes, "goals", { fa: ["هدف تازه"] });
+  assert.deepEqual(next.fa.goals, ["هدف تازه"]);
+  assert.deepEqual(next.en.goals, ["English goal"], "the English edition was erased");
+});
+
+test("passing both editions replaces both", async () => {
+  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = MeetingNotesSchema.parse({ fa: { goals: ["a"] }, en: { goals: ["b"] } });
+  const next = withSection(notes, "goals", { fa: ["x"], en: ["y"] });
+  assert.deepEqual([next.fa.goals, next.en.goals], [["x"], ["y"]]);
+});
+
+test("phases and their schedule note move together, because the proposal prints them as one", async () => {
+  const { MeetingNotesSchema, withSection, sectionValue } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = MeetingNotesSchema.parse({
+    fa: { phases: [{ title: "یک", detail: "..." }], scheduleNote: "سه هفته" },
+    en: { phases: [{ title: "One", detail: "..." }], scheduleNote: "three weeks" },
+  });
+  const next = withSection(notes, "phases", {
+    fa: { phases: [{ title: "دو", when: "", detail: "…" }], scheduleNote: "چهار هفته" },
+  });
+  assert.equal(next.fa.phases[0]!.title, "دو");
+  assert.equal(next.fa.scheduleNote, "چهار هفته");
+  assert.equal(next.en.scheduleNote, "three weeks");
+  assert.deepEqual(sectionValue(next, "phases", "en"), {
+    phases: notes.en.phases,
+    scheduleNote: "three weeks",
+  });
+});
+
+test("open questions are stored once for both editions, not inside an edition", async () => {
+  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = MeetingNotesSchema.parse({ fa: {}, en: {}, openQuestions: { fa: ["الف"], en: ["a"] } });
+  const next = withSection(notes, "openQuestions", { en: ["b", "c"] });
+  assert.deepEqual(next.openQuestions.fa, ["الف"]);
+  assert.deepEqual(next.openQuestions.en, ["b", "c"]);
+});
+
+test("a draft missing whole sections parses, because a meeting may never reach them", async () => {
+  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = MeetingNotesSchema.safeParse({ fa: {}, en: {} });
+  assert.equal(parsed.success, true);
+  assert.deepEqual(parsed.data!.fa.exclusions, []);
+  assert.equal(parsed.data!.fa.engagement, "unknown");
+});
+
+test("an engagement the model invented falls back to unknown rather than failing the draft", async () => {
+  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = MeetingNotesSchema.parse({ fa: { engagement: "partnership" }, en: {} });
+  assert.equal(parsed.fa.engagement, "unknown");
+});
+
+test("an over-long line is clamped, not rejected — a model cannot count characters", async () => {
+  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = MeetingNotesSchema.parse({ fa: { goals: ["x".repeat(900)] }, en: {} });
+  assert.ok(parsed.fa.goals[0]!.length <= 400);
+  assert.ok(parsed.fa.goals[0]!.endsWith("…"));
+});
+
+test("every rewritable section has a heading in both languages", async () => {
+  const { REWRITABLE_SECTIONS, SECTION_LABELS } = await import("../src/lib/meetings/notes-schema.ts");
+  for (const section of REWRITABLE_SECTIONS) {
+    if (section === "title") continue;
+    const label = SECTION_LABELS[section];
+    assert.ok(label, `${section} has no heading`);
+    assert.ok(label.fa.length > 0 && label.en.length > 0, `${section} is missing an edition`);
+  }
+});
+
+test("the writer is told never to invent a figure, in those words", async () => {
+  const { PROPOSAL_GUIDE } = await import("../src/lib/meetings/proposal-guide.ts");
+  // The one rule the product is judged on. If this phrasing is ever softened,
+  // that should be a deliberate act with a failing test in front of it.
+  assert.match(PROPOSAL_GUIDE, /ONLY what was actually said about money and time/);
+  assert.match(PROPOSAL_GUIDE, /Never a figure the studio did not say/);
+});

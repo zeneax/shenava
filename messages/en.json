@@ -164,7 +164,7 @@
     "undecodable": "Your browser could not decode that file.",
     "transcript": "The transcript",
     "characters": "{n} characters",
-    "nextPasses": "Next: the proposal draft, under eleven headings in both languages, written from the dialogue above. Not built yet — the specification is in prompts/PRD.md, section 12."
+    "nextPasses": "Next: pouring an approved draft into a proposal template, and the Word and print-sheet exports. The Settings and Templates screens are specified in prompts/PRD.md, section 7."
   },
   "dialogue": {
     "heading": "Who said it",
@@ -190,5 +190,36 @@
       "unreadable": "The model's answer could not be read as the shape asked for, twice. Try again; if it keeps happening, the writer model on the Settings page may not be one that returns reliable JSON.",
       "transport": "The model could not be reached. Check the OpenRouter key and its remaining credit on the Connections page."
     }
+  },
+  "draft": {
+    "heading": "The proposal draft",
+    "draw": "Draft the proposal",
+    "drawing": "Reading the meeting and writing…",
+    "drawNote": "One call, both languages at once, under eleven headings. The model writes down the facts first — who said what, every number and date — and then writes both editions from that list and from nothing else. It is told never to invent a price, a date or a number: what the meeting left open becomes a question instead.",
+    "drawWithoutDialogue": "The speakers have not been told apart yet, so the draft will be written from the raw transcript. It still works, but four of the sections read the client's own lines and the consultant's separately — running the speaker pass first makes a noticeably better draft.",
+    "waits": "The draft waits for you. Edit a section by typing, have one written again with an instruction, or redraw the whole thing. Every change sets it back to waiting, so nothing you have not read can be approved.",
+    "titleSection": "Title and engagement",
+    "edition": {
+      "fa": "Persian edition",
+      "en": "English edition"
+    },
+    "status": {
+      "pending": "Waiting for you",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "edit": "Edit",
+    "cancel": "Cancel",
+    "save": "Save this section",
+    "writeAgain": "Write it again",
+    "oneLine": "One sentence per line. Blank lines are dropped.",
+    "prose": "Prose, as it will be printed.",
+    "emptySection": "The meeting did not settle this. Left empty on purpose.",
+    "instructionHint": "What to change — \"shorter\", \"lead with the bot\", \"they are a clinic, not a shop\"",
+    "redraw": "Draw the whole draft again",
+    "redrawHint": "An instruction for the whole draft, or leave it empty",
+    "approve": "Approve this draft",
+    "reject": "Reject it",
+    "backToReview": "Back to waiting"
   }
 }

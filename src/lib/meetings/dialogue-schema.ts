@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { clampText } from "./text.ts";
+import { LANGS, type Lang } from "./langs.ts";
 
-/** The two editions every label is written in. */
-export const LANGS = ["fa", "en"] as const;
-export type Lang = (typeof LANGS)[number];
+export { LANGS, type Lang };
 
 /**
  * Who said what.

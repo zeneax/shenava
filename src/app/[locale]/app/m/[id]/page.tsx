@@ -6,6 +6,9 @@ import { DeleteMeeting } from "@/components/meetings/delete-meeting";
 import { DialogueView } from "@/components/meetings/dialogue-view";
 import { RunSpeakers } from "@/components/meetings/run-speakers";
 import { DialogueSchema } from "@/lib/meetings/dialogue-schema";
+import { DraftView } from "@/components/meetings/draft-view";
+import { RunDraft } from "@/components/meetings/run-draft";
+import { MeetingNotesSchema } from "@/lib/meetings/notes-schema";
 import { FileText, Clock, Coins, Scissors } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +35,9 @@ export default async function OneMeeting({
   const dialogue = parsedDialogue?.success && parsedDialogue.data.turns.length > 0
     ? parsedDialogue.data
     : null;
+
+  const parsedNotes = meeting.notes ? MeetingNotesSchema.safeParse(meeting.notes) : null;
+  const notes = parsedNotes?.success ? parsedNotes.data : null;
 
   return (
     <section>
@@ -135,8 +141,14 @@ export default async function OneMeeting({
         </>
       )}
 
+      {/* ── The draft ───────────────────────────────────────────────────── */}
+      {meeting.status === "transcribed" && !notes && (
+        <RunDraft id={meeting.id} hasDialogue={dialogue !== null} />
+      )}
+      {notes && <DraftView id={meeting.id} notes={notes} status={meeting.draftStatus} />}
+
       {/* ── What comes next, and is not built yet ──────────────────────── */}
-      {dialogue && (
+      {notes && (
         <p className="mt-8 border-t pt-6 text-sm leading-relaxed" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
           {t("nextPasses")}
         </p>
