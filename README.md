@@ -9,13 +9,15 @@ Fork it, run it locally, drop in an audio file, read the proposal it writes.
 > **Status: pass one works end to end. Passes two and three are being built.**
 >
 > Working: the landing page, the dashboard, Connections with a live test of all
-> three services, creating a meeting with the cut planned in your browser, and
+> three services, creating a meeting with the cut planned in your browser,
 > **transcribing** — pieces sent one at a time, each written down as it returns,
 > the transcript assembled when the last one lands, with the three real failure
-> modes handled and every call in a ledger against a spending ceiling.
+> modes handled and every call in a ledger against a spending ceiling — and
+> **telling the two speakers apart**, with the three corrections that call no
+> model: move one turn, split a turn at one sentence, or swap both sides.
 >
-> Not yet: telling the two speakers apart, the proposal draft, the Settings and
-> Templates screens, and the Word and print-sheet exports. All four are specified
+> Not yet: the proposal draft, the Settings and Templates screens, and the Word
+> and print-sheet exports. All four are specified
 > in [`prompts/PRD.md`](prompts/PRD.md), and
 > [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md) is a prompt that builds
 > the whole thing from an empty folder.

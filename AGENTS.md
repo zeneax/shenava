@@ -48,6 +48,24 @@ A key whose value is an object cannot be asked for as a string: `t("mode")` next
 to a `mode: { … }` block throws at render while the page still answers 200. Give
 the label its own key.
 
+## A relative import inside `src/lib` carries its `.ts` extension
+
+```ts
+import { readLastJson } from "./text.ts";   // yes
+import { readLastJson } from "./text";      // no — the tests cannot load it
+```
+
+The tests are run by `node --test` directly against the TypeScript, with no
+bundler in front of them, and node's ESM resolver does not guess an extension.
+Turbopack and `tsc` both accept the explicit form, so the explicit form is the
+one that works in both places. `tsconfig.json` sets
+`allowImportingTsExtensions` for exactly this.
+
+The same constraint is why pure logic must not live in a module marked
+`server-only`: that package does not resolve outside Next, so anything importing
+it is unreachable from a test. `lib/meetings/ceiling.ts` and
+`lib/settings-shape.ts` exist because of it.
+
 ## Before you commit
 
 ```bash

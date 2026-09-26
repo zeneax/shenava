@@ -1,5 +1,5 @@
-import { muxOpusOgg, OPUS_GRANULE_RATE, type OpusPacket } from "./ogg";
-import { LONG_PIECE_BITRATE } from "./segments";
+import { muxOpusOgg, OPUS_GRANULE_RATE, type OpusPacket } from "./ogg.ts";
+import { LONG_PIECE_BITRATE } from "./segments.ts";
 
 /**
  * A piece of decoded speech, as Opus in Ogg, from the browser's own encoder.

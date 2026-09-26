@@ -12,7 +12,7 @@ import {
 import { ask, type Message } from "@/lib/llm/openrouter";
 import { costOf } from "@/lib/llm/pricing";
 import { getSettings } from "@/lib/settings";
-import { outputCeilingFor } from "./ceiling";
+import { outputCeilingFor } from "./ceiling.ts";
 
 export { outputCeilingFor };
 

@@ -1,6 +1,6 @@
 import "server-only";
 import { db } from "@/lib/db";
-import { inferMode, type PieceMode } from "./segments";
+import { inferMode, type PieceMode } from "./segments.ts";
 
 /**
  * Reading one meeting and its pieces. Server-side, behind the same door as
@@ -27,6 +27,8 @@ export type Meeting = {
   durationMs: number;
   status: "planned" | "transcribing" | "transcribed" | "failed";
   transcript: string | null;
+  /** Unparsed on purpose: the page validates it, because the column is jsonb. */
+  dialogue: unknown;
   draftStatus: "pending" | "approved" | "rejected";
   costUsd: number;
   createdAt: string;
@@ -43,7 +45,7 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
   const { data: row } = await supabase
     .from("shenava_meetings")
     .select(
-      "id,title,client_name,language,audio_name,audio_bytes,audio_sha256,duration_ms,status,transcript,draft_status,cost_usd,created_at",
+      "id,title,client_name,language,audio_name,audio_bytes,audio_sha256,duration_ms,status,transcript,dialogue,draft_status,cost_usd,created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -79,6 +81,7 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
     durationMs: row.duration_ms,
     status: row.status,
     transcript: row.transcript,
+    dialogue: row.dialogue,
     draftStatus: row.draft_status,
     costUsd: Number(row.cost_usd ?? 0),
     createdAt: row.created_at,

@@ -164,6 +164,31 @@
     "undecodable": "Your browser could not decode that file.",
     "transcript": "The transcript",
     "characters": "{n} characters",
-    "nextPasses": "Next: telling the two speakers apart, and the proposal draft. Neither is built yet — the specification for both is in prompts/PRD.md, sections 2 and 11."
+    "nextPasses": "Next: the proposal draft, under eleven headings in both languages, written from the dialogue above. Not built yet — the specification is in prompts/PRD.md, section 12."
+  },
+  "dialogue": {
+    "heading": "Who said it",
+    "turns": "{n} turns",
+    "run": "Tell the two speakers apart",
+    "runAgain": "Run the speaker pass again",
+    "running": "Reading the whole transcript…",
+    "runNote": "One model call over the whole transcript at once, not per piece — labels decided piece by piece disagree at the boundaries. The model answers with sentence numbers and never rewrites a word, so the worst it can get wrong is a label.",
+    "unnamed": "not named in the meeting",
+    "both": "Both sides",
+    "swap": "Swap the two sides",
+    "swapWhy": "For a pass that had the two people the wrong way round from the start. Moves the whole meeting.",
+    "moveTo": "Move to {side}",
+    "moveWhole": "Moves this turn and nothing else. No model is called.",
+    "split": "{n} sentences",
+    "splitWhy": "The usual miss is a one-word answer swallowed by the turn around it. Open the turn and move just that sentence.",
+    "splitHint": "Press a sentence to move it to {side}. What comes before and after keeps this turn's side.",
+    "reason": {
+      "over_ceiling": "That would take today or this month past its spending ceiling, so it was refused before it was sent. Raise the ceiling on the Settings page, or wait.",
+      "no_transcript": "There is no transcript yet. Send the pieces first.",
+      "no_database": "The database is not connected. Open Connections.",
+      "no_meeting": "This meeting no longer exists.",
+      "unreadable": "The model's answer could not be read as the shape asked for, twice. Try again; if it keeps happening, the writer model on the Settings page may not be one that returns reliable JSON.",
+      "transport": "The model could not be reached. Check the OpenRouter key and its remaining credit on the Connections page."
+    }
   }
 }

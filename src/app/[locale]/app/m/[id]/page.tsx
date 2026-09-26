@@ -3,6 +3,9 @@ import { setRequestLocale, getTranslations } from "next-intl/server";
 import { readMeeting } from "@/lib/meetings/read";
 import { Listener } from "@/components/meetings/listener";
 import { DeleteMeeting } from "@/components/meetings/delete-meeting";
+import { DialogueView } from "@/components/meetings/dialogue-view";
+import { RunSpeakers } from "@/components/meetings/run-speakers";
+import { DialogueSchema } from "@/lib/meetings/dialogue-schema";
 import { FileText, Clock, Coins, Scissors } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +25,13 @@ export default async function OneMeeting({
 
   const minutes = Math.round(meeting.durationMs / 60_000);
   const done = meeting.pieces.filter((p) => p.status === "done").length;
+
+  // Parsed rather than trusted: the column is jsonb and anything could be in it,
+  // including a shape an older version of this code wrote.
+  const parsedDialogue = meeting.dialogue ? DialogueSchema.safeParse(meeting.dialogue) : null;
+  const dialogue = parsedDialogue?.success && parsedDialogue.data.turns.length > 0
+    ? parsedDialogue.data
+    : null;
 
   return (
     <section>
@@ -117,8 +127,16 @@ export default async function OneMeeting({
         </article>
       )}
 
-      {/* ── What comes next, and is not built yet ──────────────────────── */}
+      {/* ── Who said it ─────────────────────────────────────────────────── */}
       {meeting.status === "transcribed" && (
+        <>
+          <RunSpeakers id={meeting.id} again={dialogue !== null} />
+          {dialogue && <DialogueView id={meeting.id} dialogue={dialogue} />}
+        </>
+      )}
+
+      {/* ── What comes next, and is not built yet ──────────────────────── */}
+      {dialogue && (
         <p className="mt-8 border-t pt-6 text-sm leading-relaxed" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
           {t("nextPasses")}
         </p>

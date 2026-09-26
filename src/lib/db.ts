@@ -1,6 +1,6 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { supabaseUrl, supabaseServiceKey, configured } from "./env";
+import { supabaseUrl, supabaseServiceKey, configured } from "./env.ts";
 
 /**
  * The one database client, holding the service role key.

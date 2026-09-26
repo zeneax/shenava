@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { appPassword } from "./env";
+import { appPassword } from "./env.ts";
 
 /**
  * The one function that answers "may this person use the dashboard".
