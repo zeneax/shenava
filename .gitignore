@@ -1,0 +1,15 @@
+node_modules/
+.next/
+out/
+build/
+.env
+.env.local
+.env*.local
+.DS_Store
+*.log
+.vercel/
+tsconfig.tsbuildinfo
+next-env.d.ts
+/samples/*.m4a
+/samples/*.wav
+/samples/*.mp3
