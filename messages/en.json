@@ -1,5 +1,8 @@
 {
-  "brand": { "name": "Shenava", "tagline": "A meeting becomes a proposal." },
+  "brand": {
+    "name": "Shenava",
+    "tagline": "A meeting becomes a proposal."
+  },
   "nav": {
     "dashboard": "Dashboard",
     "meetings": "Meetings",
@@ -17,13 +20,39 @@
     "openDashboard": "Open the dashboard",
     "readSpec": "Read the specification",
     "passesTitle": "Three passes, each useless without the one before it",
-    "pass1": { "n": "One", "title": "The words", "body": "Your browser cuts the recording into pieces and sends them one at a time. Each piece is saved the moment it comes back, so a closed tab halfway through an hour loses nothing." },
-    "pass2": { "n": "Two", "title": "Who said it", "body": "A model decides which sentences are the consultant's and which are the client's. It answers with sentence ranges and never rewrites anything, so a wrong answer is only ever a wrong label." },
-    "pass3": { "n": "Three", "title": "The draft", "body": "A model reads the labelled dialogue and writes the proposal as finished sentences, in both languages. It is told never to invent a price, a date or a number — what the meeting left open becomes a question." },
+    "pass1": {
+      "n": "One",
+      "title": "The words",
+      "body": "Your browser cuts the recording into pieces and sends them one at a time. Each piece is saved the moment it comes back, so a closed tab halfway through an hour loses nothing."
+    },
+    "pass2": {
+      "n": "Two",
+      "title": "Who said it",
+      "body": "A model decides which sentences are the consultant's and which are the client's. It answers with sentence ranges and never rewrites anything, so a wrong answer is only ever a wrong label."
+    },
+    "pass3": {
+      "n": "Three",
+      "title": "The draft",
+      "body": "A model reads the labelled dialogue and writes the proposal as finished sentences, in both languages. It is told never to invent a price, a date or a number — what the meeting left open becomes a question."
+    },
     "modesTitle": "Two ways of cutting the audio",
     "modesLede": "A transcription request is capped at about 2 MiB. An hour of speech does not fit, so the recording is cut — and how it is cut decides how long you wait.",
-    "modeMinute": { "title": "Minute pieces", "for": "Short recordings", "a": "60 seconds per piece, uncompressed WAV", "b": "Cut at the quietest moment in the 20 seconds before each minute", "c": "About 60 requests for an hour of audio", "d": "12 to 15 minutes of waiting" },
-    "modeLong": { "title": "Long pieces", "for": "A real meeting", "a": "9 minutes per piece, Opus at 24 kbit/s, compressed in your browser", "b": "1.6 MB per piece — under the cap one raw minute nearly fills", "c": "6 or 7 requests for an hour of audio", "d": "4 to 5 minutes of waiting" },
+    "modeMinute": {
+      "title": "Minute pieces",
+      "for": "Short recordings",
+      "a": "60 seconds per piece, uncompressed WAV",
+      "b": "Cut at the quietest moment in the 20 seconds before each minute",
+      "c": "About 60 requests for an hour of audio",
+      "d": "12 to 15 minutes of waiting"
+    },
+    "modeLong": {
+      "title": "Long pieces",
+      "for": "A real meeting",
+      "a": "9 minutes per piece, Opus at 24 kbit/s, compressed in your browser",
+      "b": "1.6 MB per piece — under the cap one raw minute nearly fills",
+      "c": "6 or 7 requests for an hour of audio",
+      "d": "4 to 5 minutes of waiting"
+    },
     "privacyTitle": "Your audio is never stored",
     "privacyBody": "Not in the database, not in object storage, not on disk. Your browser cuts the file locally and uploads one piece at a time to a function that transcribes it and forgets it. The text is kept, deliberately, because the text is the product.",
     "costTitle": "What an hour costs",
@@ -78,5 +107,42 @@
     "doorClosed": "APP_PASSWORD is set, so the dashboard asks for it.",
     "doorWarn": "Set it before you put this on a public domain: a public deployment carries your OpenRouter key, and anyone who opens the record page is spending your money."
   },
-  "soon": { "title": "Being built", "body": "This screen is not written yet. The specification for it is in prompts/PRD.md." }
+  "soon": {
+    "title": "Being built",
+    "body": "This screen is not written yet. The specification for it is in prompts/PRD.md."
+  },
+  "new": {
+    "heading": "New meeting",
+    "lede": "Choose a recording. Your browser decodes it, cuts it, and shows you the plan before anything is uploaded — the file itself never leaves this page.",
+    "title": "Title",
+    "client": "Client",
+    "language": "Language spoken",
+    "lang": {
+      "auto": "Let the engine decide",
+      "farsi": "Persian",
+      "english": "English"
+    },
+    "modeLabel": "How to cut it",
+    "mode": {
+      "minute": {
+        "title": "Minute pieces",
+        "body": "60 seconds each, uncompressed. About 60 requests for an hour of audio, and 12 to 15 minutes of waiting. Right for a short recording."
+      },
+      "long": {
+        "title": "Long pieces",
+        "body": "9 minutes each, compressed in your browser to Opus. Six or seven requests for an hour of audio, and four or five minutes of waiting. Right for a real meeting.",
+        "unavailable": "This browser has no Opus encoder, so it cannot compress the pieces. Safari is the usual case — Chrome or Firefox can."
+      }
+    },
+    "file": "The recording",
+    "fileNote": "Any format your browser can play. Up to three hours. Nothing is uploaded when you choose it.",
+    "reading": "Decoding and cutting…",
+    "tooLong": "That recording is longer than three hours, which is more than the browser can hold decoded. Split it in two and make two meetings.",
+    "undecodable": "Your browser could not decode that file. Try exporting it as WAV, MP3 or M4A.",
+    "planTitle": "What will happen",
+    "planLine": "{duration} minutes of audio becomes {pieces} pieces, sent one after another — about {minutes} minutes of waiting.",
+    "planBytes": "The file is {mb} MB. It stays on this machine; only the pieces are sent, and only as they are needed.",
+    "refused": "Not created:",
+    "create": "Create the meeting"
+  }
 }
