@@ -1,3 +1,75 @@
+# Working on Shenava
+
+Shenava turns a recorded consultation into a transcript, a speaker-labelled
+dialogue and a draft of the proposal that meeting should produce, in Persian and
+English at once.
+
+**The documentation exists. Read it rather than inferring from the code.**
+
+`README.md` — running it, the two cutting modes, why there is no login.
+`prompts/PRD.md` — the specification, and `PRD.fa.md` in Persian.
+`prompts/BUILD-PROMPT.md` — the instruction this project can be rebuilt from.
+`docs/the-journey-of-a-file.md` — one recording from chosen to drafted, with
+every number and the reason for it. **Read this before touching
+`src/lib/meetings/`.**
+
+## Four rules that are not negotiable
+
+**The kernel owns the tuned numbers.** `@mazarix/voice-kernel` (MIT, on npm)
+holds the recording cap, the sample rate, the WAV header, the transcription
+prompt, the retry policy, the timeout curve, the rescue engine and the bidi
+algorithm. Nothing here may carry its own copy of one of them. Two programs with
+their own copies drift apart silently and no test can see it.
+
+**`planSegments` must stay a pure function of the samples.** No clock, no
+randomness, nothing read off the device. A meeting is an hour of pieces sent one
+at a time and a closed tab is ordinary; resumption depends on the same file
+producing exactly the same cuts. Break it and the symptom is a transcript with a
+hole in it, with nothing to point at.
+
+**The audio is never stored.** Not in the database, not in object storage, not on
+disk. The browser cuts locally and uploads one piece at a time to a function
+that transcribes it and forgets it. The text is kept; the recording is not.
+
+**The draft never invents a figure.** No price, date, percentage, headcount or
+deadline that the meeting did not contain. A number that was said is kept
+exactly; a number that was not said becomes an open question. This is the one
+rule the product is judged on.
+
+## Both languages move together
+
+`messages/fa.json` and `messages/en.json` must hold the same key set. Persian is
+not a translation of the English — it is written as Persian, and the two
+editions may differ in wording where that reads better. Real industry terms keep
+their Latin spelling inside Persian (Postgres, TypeScript, Opus); consumer brands
+do not.
+
+A key whose value is an object cannot be asked for as a string: `t("mode")` next
+to a `mode: { … }` block throws at render while the page still answers 200. Give
+the label its own key.
+
+## Before you commit
+
+```bash
+npm run typecheck && npm test
+```
+
+Then check the Persian pages at 320 pixels wide for horizontal scroll. Watch for
+absolutely positioned descendants of a horizontal scroller — a screen-reader-only
+label is `position: absolute`, and if the scroller is not its containing block it
+is not clipped, it widens the document instead. Give the scroller
+`position: relative`.
+
+## Notes go in docs/
+
+When something costs you real time **because nothing in the repository could
+have told you what was wrong**, add a note: the symptom as it appeared, what it
+turned out to be, and the command that would find it again. The last part is the
+point. A bug that was merely hard to fix needs no note — the fix is in the
+history.
+
+---
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
