@@ -107,10 +107,6 @@
     "doorClosed": "APP_PASSWORD is set, so the dashboard asks for it.",
     "doorWarn": "Set it before you put this on a public domain: a public deployment carries your OpenRouter key, and anyone who opens the record page is spending your money."
   },
-  "soon": {
-    "title": "Being built",
-    "body": "This screen is not written yet. The specification for it is in prompts/PRD.md."
-  },
   "new": {
     "heading": "New meeting",
     "lede": "Choose a recording. Your browser decodes it, cuts it, and shows you the plan before anything is uploaded — the file itself never leaves this page.",
@@ -267,5 +263,62 @@
     "sectionsNote": "These are the draft's own section keys, which is what makes pouring a copy rather than a mapping. They are not editable here on purpose — a template naming a key the draft does not have prints nothing for it, which is right for a template that outlived a schema change and wrong to hand somebody a free-text box for. A dot marks a section that is dropped when the meeting left it empty.",
     "save": "Save this template",
     "saved": "Saved."
+  },
+  "settings": {
+    "heading": "Settings",
+    "lede": "Two seats spend money here, and they want different models: the transcriber turns audio into words and wants something fast and multimodal; the writer reads the whole meeting and wants judgement. One shared model setting would force one of them to be wrong.",
+    "noDatabase": "The database is not connected, so these are the built-in defaults and saving will be refused. Open Connections to see what is missing.",
+    "studio": "Who the proposal speaks as",
+    "studioNote": "The draft is written against these. They are the reason this project is forkable: your proposals sound like your studio without anyone editing a prompt in the source. Left empty, the draft writes \"we\" and never invents a name.",
+    "transcriber": "The transcriber",
+    "transcriberNote": "Billed per piece of audio. A meeting in the long cutting mode is six or seven calls; in the minute mode it is about sixty. The recording cap, the prompt, the retry policy and the timeout curve are not settings — they come from @mazarix/voice-kernel, so that this app and anything else built on the same kernel cannot drift apart.",
+    "writer": "The writer",
+    "writerNote": "Two calls per meeting at most: once to tell the speakers apart, once to draft. This is the pass that needs judgement, so it is worth a better model — and the whole meeting costs cents either way.",
+    "ceilings": "Spending ceilings",
+    "ceilingsNote": "Read BEFORE every call, and a call that would go over is refused before it is sent. A limit enforced afterwards is a report, not a limit. The figures come from the ledger, so a meeting redrawn next month does not count against last month.",
+    "retention": "How long a meeting is kept",
+    "retentionNote": "The audio was never stored. This is about the text — the transcript, the dialogue and the draft — which is kept because it is the product. The clear-out runs when you call shenava_clear_out(), or on a schedule if you set one up with pg_cron.",
+    "field": {
+      "studioName": "Studio name, in Latin script",
+      "studioNameFa": "Studio name, in Persian",
+      "studioVoice": "A note on how your studio writes",
+      "sttModel": "Transcription model",
+      "sttFallbackModel": "Second engine, for a refused piece",
+      "sttMaxOutputTokens": "Output ceiling, per piece",
+      "writerModel": "Writer model",
+      "writerTemperature": "Temperature",
+      "writerMaxOutputTokens": "Output ceiling, per draft",
+      "dailyCeilingUsd": "A day, in US dollars",
+      "monthlyCeilingUsd": "A month, in US dollars",
+      "retentionDays": "Days"
+    },
+    "hint": {
+      "studioVoice": "Words to avoid, how formal to be, anything a colleague would tell a new writer. It goes into the prompt as your studio's own note.",
+      "sttFallbackModel": "Optional. Used when the first engine's safety filter stops a piece. Leave empty to rely on halving the piece instead.",
+      "sttMaxOutputTokens": "A floor, not a fixed number — a nine-minute piece is given far more room automatically. A long piece sent under a short ceiling comes back truncated, and a truncated transcript reads like bad audio.",
+      "writerTemperature": "0.3 is a good place for this work. Higher invents; lower repeats the transcript back at you.",
+      "writerMaxOutputTokens": "Also a floor. Two editions of a long meeting plus its fact list is more than any fixed number, so the real ceiling is sized to the material.",
+      "zeroMeansNone": "Zero means no ceiling at all.",
+      "retentionDays": "Zero means keep forever, which is the default."
+    },
+    "spent": "Spent so far: ${today} today, ${month} this month.",
+    "unpriced": "Not in the price table — calls to this model will be counted as free.",
+    "unpricedSaved": "Saved, but a model you chose has no price entry, so its spending will read as zero and the ceilings will never notice it. Add it to lib/llm/pricing.ts.",
+    "save": "Save the settings",
+    "saved": "Saved.",
+    "didNotSave": "Did not save:",
+    "code": {
+      "too_small": "is too small",
+      "too_big": "is too large",
+      "invalid_type": "is not the kind of value this field takes",
+      "invalid_value": "is not one of the allowed values",
+      "unrecognized_keys": "was sent a key this form does not know",
+      "invalid_format": "is not in the right format"
+    },
+    "reason": {
+      "denied": "You are not signed in.",
+      "no-database": "The database is not connected. Open Connections.",
+      "write-failed": "The database refused the write."
+    }
   }
 }

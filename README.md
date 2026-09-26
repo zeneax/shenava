@@ -6,30 +6,10 @@ in Persian and English at once.**
 
 Fork it, run it locally, drop in an audio file, read the proposal it writes.
 
-> **Status: all three passes work. The screens around them are being finished.**
->
-> Working: the landing page, the dashboard, Connections with a live test of all
-> three services, creating a meeting with the cut planned in your browser,
-> **transcribing** — pieces sent one at a time, each written down as it returns,
-> the transcript assembled when the last one lands, with the three real failure
-> modes handled — **telling the two speakers apart**, with the three corrections
-> that call no model, and the **proposal draft** under eleven headings in both
-> languages, which you edit by typing, have rewritten one section at a time,
-> redraw with an instruction, and then approve or reject. Every model call is
-> checked against a daily and a monthly spending ceiling before it is sent, and
-> every one of them is a row in a ledger.
->
-> …and an approved draft **poured into a proposal template** as a numbered
-> proposal, with **Word and print-sheet exports** of the draft, the dialogue or
-> the transcript in either language. The Templates screen edits the names and the
-> house lines every proposal of yours ends with.
->
-> Not yet: the Settings screen (the seats, the ceilings and the studio's name are
-> in the database and read by everything, but there is no form for them yet — set
-> them in the Supabase table editor meanwhile). All four are specified
-> in [`prompts/PRD.md`](prompts/PRD.md), and
-> [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md) is a prompt that builds
-> the whole thing from an empty folder.
+> **Status: complete and running locally. Not yet exercised against a real
+> recording end to end** — the unit suite and the typecheck are green and every
+> page renders, but the first real hour of audio has not gone through it yet. If
+> you are that first person, [open an issue](../../issues) with whatever breaks.
 
 ---
 
@@ -103,45 +83,200 @@ those things.
 
 ---
 
-## Running it
+## Getting it running — step by step
 
-You need Node 20 or newer, a free Supabase project, and an OpenRouter key with a
-few dollars on it.
+This is the whole thing, from an empty folder to a working dashboard. It takes
+about ten minutes, and eight of those are waiting for Supabase to finish creating
+a project.
 
-**1. Clone and install.**
+You need **Node 20 or newer** (`node -v` to check) and a free
+[Supabase](https://supabase.com) account.
+
+---
+
+### Step 1 · Fork it, clone it, install it
+
+Press **Fork** at the top of this page, then:
 
 ```bash
-git clone <your fork> shenava && cd shenava
+git clone https://github.com/<your-username>/shenava.git
+cd shenava
 npm install
 ```
 
-**2. Make the tables.** Open your Supabase project → SQL Editor → New query,
-paste [`db/01_schema.sql`](db/01_schema.sql) and run it, then do the same with
-[`db/02_seed.sql`](db/02_seed.sql). The second one gives you the built-in
-proposal template and **one fully worked sample meeting**, so the app has
-something to show you before you have recorded anything.
+---
 
-**3. Fill in the environment.**
+### Step 2 · Make a Supabase project
+
+Supabase is the database. The free tier is enough for this.
+
+Open **[supabase.com/dashboard](https://supabase.com/dashboard)** and press
+**New project**.
+
+Give it any name — `shenava` is fine. Set a database password; you will not need
+it for this app, but save it somewhere anyway. Pick the region closest to you,
+because every query in the app makes that round trip.
+
+Press **Create new project** and wait. It takes two to five minutes, and the
+dashboard will tell you when it is ready.
+
+---
+
+### Step 3 · Make the tables
+
+In your project, open **SQL Editor** in the left sidebar, then **New query**.
+
+**3a.** Open [`db/01_schema.sql`](db/01_schema.sql) from this repository, copy
+the whole file, paste it into the editor, and press **Run**. It creates six
+tables, three functions and the security rules. It is safe to run twice.
+
+**3b.** Do the same with [`db/02_seed.sql`](db/02_seed.sql). This one gives you
+the built-in proposal template and **one fully worked sample meeting** —
+transcript, speaker-labelled dialogue and finished proposal draft — so the app has
+something to show you before you have recorded anything. The bookshop in it is
+invented; delete the meeting whenever you like.
+
+You should see `Success. No rows returned` after each. If you see an error, read
+it: the most common one is running `02_seed.sql` before `01_schema.sql`.
+
+---
+
+### Step 4 · Get an OpenRouter key
+
+OpenRouter is how the app reaches every model — one key for all of them.
+
+Make an account at **[openrouter.ai](https://openrouter.ai)**, then open
+**[openrouter.ai/keys](https://openrouter.ai/keys)** and press **Create key**.
+Copy it now; the page will not show it again.
+
+Add a few dollars of credit under **Credits**. An hour-long meeting costs roughly
+**20 cents** end to end — a few cents to transcribe and fifteen to twenty to
+draft.
+
+> One thing worth knowing in advance: below about **$1** of remaining credit,
+> OpenRouter starts answering `402` to concurrent calls. If transcription ever
+> fails on every piece at once, check the balance before looking at anything else.
+
+---
+
+### Step 5 · Tell Shenava about all of it
+
+```bash
+npm run setup
+```
+
+This asks for each value one at a time and **tests it immediately** — it fetches
+your Supabase project, tries the key against a real table, calls OpenRouter and
+reports the credit left, checks whether the six tables exist, and only then writes
+`.env.local`. A typo is caught in the second you make it rather than three screens
+later.
+
+It will ask you three things:
+
+**The Supabase Project URL and the `service_role` key.** Both are in your project
+under **Project Settings → API**. The URL looks like
+`https://abcdefghijklm.supabase.co`. The `service_role` key is the long one marked
+*secret* — not the `anon` one. It bypasses row-level security, which is why it
+stays on the server and never goes into a `NEXT_PUBLIC_` variable.
+
+**The OpenRouter key** from step 4.
+
+**Whether this will be reachable from the internet.** Say no if you are just
+running it on your own machine — see the next section for why. Say yes and it will
+ask for a password and generate a signing secret for you.
+
+Run `npm run setup` again any time to change any of it. It keeps every value you
+do not change, and it never prints a key back to the screen.
+
+**If you would rather not use the script:**
 
 ```bash
 cp .env.example .env.local
 ```
 
-The file explains each variable. Two are required (`NEXT_PUBLIC_SUPABASE_URL`
-and `SUPABASE_SERVICE_ROLE_KEY`), one is required to transcribe anything
-(`OPENROUTER_API_KEY`), and `APP_PASSWORD` should be left **empty** — see below.
+`.env.example` lists every variable with a comment explaining it. Three are
+required: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
+`OPENROUTER_API_KEY`. Leave `APP_PASSWORD` empty.
 
-**4. Run it.**
+---
+
+### Step 6 · Run it
 
 ```bash
 npm run dev
 ```
 
-Open http://localhost:3000. The Connections page tells you which of the three
-services answered, and the sample meeting shows you every stage of the product
-with no key set at all.
+Open **[http://localhost:3100](http://localhost:3100)**. Port 3100 rather than
+3000, so it does not collide with whatever else you have running.
+
+Press **Dashboard**. You should see the sample meeting in the list. Open it and
+you can read its transcript, its dialogue with the two speakers told apart, and
+its proposal draft in either language — all without a single model call, because
+it came from the seed file.
+
+**If something is wrong**, open **Connections** in the left rail. It repeats every
+check the setup script made and answers line by line: which variables are set,
+whether Supabase and OpenRouter actually respond, and whether all six tables
+exist. It is the first place to look whenever anything stops working.
+
+> Next.js reads the environment when it starts. If you change `.env.local`, stop
+> the dev server and start it again.
 
 ---
+
+### Step 7 · Put your own studio's name in
+
+Open **Settings**. The draft is written against what is on this page, so filling it
+in is what makes the output sound like your studio rather than nobody's.
+
+Set your studio's name in both scripts, and write a line or two under *how your
+studio writes* — words to avoid, how formal to be, whatever you would tell a new
+writer on your team. It goes into the prompt as your own note.
+
+While you are there: the two seats have their own models, the spending ceilings
+default to **$3 a day and $30 a month**, and a call that would take you past
+either is refused *before it is sent*.
+
+---
+
+### Step 8 · Your first real meeting
+
+Press **New meeting**. Give it a title and the client's name, choose the language
+spoken, and pick a recording.
+
+Choosing the file **uploads nothing.** Your browser decodes it, cuts it, and shows
+you the plan first — *"39 minutes of audio becomes 5 pieces, about 4 minutes of
+waiting"* — with a bar for each piece. Only then does anything leave your machine,
+and only one piece at a time.
+
+**Choose the cutting mode deliberately.** *Long pieces* is what you want for a
+real meeting: nine minutes per request, six or seven requests for an hour, four to
+five minutes of waiting. *Minute pieces* is sixty requests and twelve to fifteen
+minutes, and is there for short recordings and for browsers with no Opus encoder
+(Safari, at the time of writing — the option disables itself and says so).
+
+Press **Create the meeting**, open it, and the sending starts. Leave the tab open.
+If you close it, nothing is lost: every piece is saved the moment it returns, and
+reopening the meeting asks you to point at the same file again and carries on from
+where it stopped. It checks the file's fingerprint before sending a single byte.
+
+When the transcript lands: **tell the two speakers apart**, then **draft the
+proposal**, then read it, fix what you want, approve it, and pour it into a
+template. Word and print-sheet downloads are at the bottom.
+
+---
+
+### Step 9 · Deploying it, if you want to
+
+You do not have to — this works perfectly well on your own machine, which is where
+most people will keep it.
+
+If you do deploy it (Vercel takes this repository as it is), **two things change
+and both matter.** Set `APP_PASSWORD` and `APP_SESSION_SECRET` in the host's
+environment variables, because a public deployment carries **your** OpenRouter key
+and anyone who finds the URL and opens the record page is spending your money. And
+set `OPENROUTER_APP_URL` to the real address, which is how OpenRouter labels your
+usage.
 
 ## There is no login, and that is on purpose
 
@@ -178,10 +313,18 @@ month, and every call is a row in a ledger you can read.
 
 ```
 db/        01_schema.sql, 02_seed.sql — paste into the Supabase SQL Editor
+scripts/   setup.mjs — `npm run setup`, which asks for each key and tests it
 prompts/   PRD.md, PRD.fa.md, BUILD-PROMPT.md — the spec, and the prompt that builds it
 docs/      the journey of a file, and notes on things that were hard to find
 src/       the application
-tests/     node --test; the audio layer is covered
+tests/     `npm test` — 88 of them, no browser and no network needed
+```
+
+```bash
+npm run setup      # ask for the keys, test each one, write .env.local
+npm run dev        # http://localhost:3100
+npm test           # the unit suite
+npm run typecheck
 ```
 
 **If you are about to change how the audio is cut, read

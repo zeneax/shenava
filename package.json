@@ -5,6 +5,7 @@
   "description": "A recorded consultation becomes a transcript, a labelled dialogue, and a proposal draft.",
   "license": "MIT",
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "next dev --port 3100",
     "build": "next build",
     "start": "next start --port 3100",
