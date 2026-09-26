@@ -6,10 +6,19 @@ in Persian and English at once.**
 
 Fork it, run it locally, drop in an audio file, read the proposal it writes.
 
-> **Status: the specification and the database are here; the application is
-> being built.** If you have arrived early, [`prompts/PRD.md`](prompts/PRD.md)
-> is the full specification and [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md)
-> is a prompt that builds it from an empty folder.
+> **Status: pass one works end to end. Passes two and three are being built.**
+>
+> Working: the landing page, the dashboard, Connections with a live test of all
+> three services, creating a meeting with the cut planned in your browser, and
+> **transcribing** — pieces sent one at a time, each written down as it returns,
+> the transcript assembled when the last one lands, with the three real failure
+> modes handled and every call in a ledger against a spending ceiling.
+>
+> Not yet: telling the two speakers apart, the proposal draft, the Settings and
+> Templates screens, and the Word and print-sheet exports. All four are specified
+> in [`prompts/PRD.md`](prompts/PRD.md), and
+> [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md) is a prompt that builds
+> the whole thing from an empty folder.
 
 ---
 

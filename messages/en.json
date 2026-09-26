@@ -144,5 +144,26 @@
     "planBytes": "The file is {mb} MB. It stays on this machine; only the pieces are sent, and only as they are needed.",
     "refused": "Not created:",
     "create": "Create the meeting"
+  },
+  "meeting": {
+    "untitled": "Untitled meeting",
+    "minutes": "{minutes} minutes of audio",
+    "piecesOf": "{done} of {total} pieces · {mode}",
+    "mode": {
+      "minute": "minute pieces",
+      "long": "long pieces"
+    },
+    "delete": "Delete",
+    "deleteConfirm": "Yes, delete it",
+    "cancel": "Keep it",
+    "resumeTitle": "Point at the recording again",
+    "resumeBody": "{pending} of {total} pieces are still to send. The audio was never stored — not here, not in the database, not anywhere — so choose the same file again and Shenava carries on from where it stopped. It checks the file's fingerprint before sending a single byte.",
+    "sending": "Sent {done} of {total}. One piece at a time; leave this tab open.",
+    "mismatch": "That is a different recording. The fingerprint does not match the one this meeting was planned from, and sending it would fill the waiting pieces with the wrong seconds. Choose the original file, or delete this meeting and start again.",
+    "replanned": "That file cuts into a different number of pieces than this meeting was planned with. It is probably a re-export rather than the original. Delete this meeting and create it again from the file you have.",
+    "undecodable": "Your browser could not decode that file.",
+    "transcript": "The transcript",
+    "characters": "{n} characters",
+    "nextPasses": "Next: telling the two speakers apart, and the proposal draft. Neither is built yet — the specification for both is in prompts/PRD.md, sections 2 and 11."
   }
 }
