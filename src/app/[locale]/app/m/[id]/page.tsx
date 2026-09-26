@@ -9,6 +9,9 @@ import { DialogueSchema } from "@/lib/meetings/dialogue-schema";
 import { DraftView } from "@/components/meetings/draft-view";
 import { RunDraft } from "@/components/meetings/run-draft";
 import { MeetingNotesSchema } from "@/lib/meetings/notes-schema";
+import { PourIntoTemplate } from "@/components/meetings/pour-into-template";
+import { readTemplates, readProposalNumber } from "@/lib/meetings/templates-read";
+import { suggestTemplate } from "@/lib/meetings/template";
 import { FileText, Clock, Coins, Scissors } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +41,11 @@ export default async function OneMeeting({
 
   const parsedNotes = meeting.notes ? MeetingNotesSchema.safeParse(meeting.notes) : null;
   const notes = parsedNotes?.success ? parsedNotes.data : null;
+
+  // The templates are only read when there is a draft to pour into one.
+  const templates = notes ? await readTemplates() : [];
+  const suggested = notes ? suggestTemplate(templates, notes[locale === "fa" ? "fa" : "en"].engagement) : null;
+  const number = notes ? await readProposalNumber(meeting.proposalId) : null;
 
   return (
     <section>
@@ -147,11 +155,15 @@ export default async function OneMeeting({
       )}
       {notes && <DraftView id={meeting.id} notes={notes} status={meeting.draftStatus} />}
 
-      {/* ── What comes next, and is not built yet ──────────────────────── */}
+      {/* ── The template, and the documents ───────────────────────────── */}
       {notes && (
-        <p className="mt-8 border-t pt-6 text-sm leading-relaxed" style={{ borderColor: "var(--line)", color: "var(--ink-soft)" }}>
-          {t("nextPasses")}
-        </p>
+        <PourIntoTemplate
+          id={meeting.id}
+          templates={templates}
+          suggested={suggested?.id ?? null}
+          approved={meeting.draftStatus === "approved"}
+          poured={number ? { number } : null}
+        />
       )}
     </section>
   );

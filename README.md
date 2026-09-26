@@ -19,8 +19,14 @@ Fork it, run it locally, drop in an audio file, read the proposal it writes.
 > checked against a daily and a monthly spending ceiling before it is sent, and
 > every one of them is a row in a ledger.
 >
-> Not yet: pouring an approved draft into a proposal template, the Settings and
-> Templates screens, and the Word and print-sheet exports. All four are specified
+> …and an approved draft **poured into a proposal template** as a numbered
+> proposal, with **Word and print-sheet exports** of the draft, the dialogue or
+> the transcript in either language. The Templates screen edits the names and the
+> house lines every proposal of yours ends with.
+>
+> Not yet: the Settings screen (the seats, the ceilings and the studio's name are
+> in the database and read by everything, but there is no form for them yet — set
+> them in the Supabase table editor meanwhile). All four are specified
 > in [`prompts/PRD.md`](prompts/PRD.md), and
 > [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md) is a prompt that builds
 > the whole thing from an empty folder.

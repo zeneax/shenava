@@ -221,5 +221,51 @@
     "approve": "Approve this draft",
     "reject": "Reject it",
     "backToReview": "Back to waiting"
+  },
+  "pour": {
+    "heading": "Into a proposal",
+    "lede": "The draft's sections are the template's own keys, so pouring is a copy and not a translation of one shape into another. The template decides which sections your proposals print, under what headings, and the lines they always end with.",
+    "suggested": "suggested",
+    "noTemplates": "There are no templates. Run db/02_seed.sql for the built-in one, or make your own on the Templates page.",
+    "edition": {
+      "fa": "Persian",
+      "en": "English"
+    },
+    "pour": "Pour the draft into this template",
+    "pourAgain": "Pour it again",
+    "approveFirst": "Approve the draft first — this is the one gate between a model's sentences and a document with a number on it.",
+    "made": "Proposal {number}",
+    "documents": "Documents",
+    "documentsNote": "Word is a file; the printer icon opens an A4 sheet with the print dialog already up, so \"Save as PDF\" is one press. There is no server-side PDF on purpose — a Persian PDF rendered without a real browser gets the shaping and the bidi wrong in ways that look fine in English.",
+    "part": {
+      "notes": "The draft",
+      "dialogue": "The dialogue",
+      "transcript": "The transcript"
+    },
+    "printTitle": "Open as an A4 sheet to print or save as PDF",
+    "reason": {
+      "not approved": "The draft has not been approved yet.",
+      "no draft": "There is no draft to pour.",
+      "no database": "The database is not connected. Open Connections.",
+      "no such template": "That template no longer exists."
+    }
+  },
+  "templates": {
+    "heading": "Proposal templates",
+    "lede": "A template is the shape of the document a draft is poured into: which sections you print, under what headings, and the lines every proposal of yours ends with. Two studios reading the same meeting should get the same draft and different documents.",
+    "untitled": "Unnamed template",
+    "isDefault": "Default",
+    "none": "There are no templates yet. Run db/02_seed.sql in your Supabase project's SQL Editor and the built-in one appears here.",
+    "nameFa": "Persian",
+    "nameEn": "English",
+    "engagement": "What this template is for",
+    "engagementNote": "The meeting page suggests the template whose engagement matches the draft's. Leave it as \"not settled\" for a general-purpose template.",
+    "houseLines": "The lines every proposal ends with",
+    "houseLinesNote": "Your terms, your validity period, your bank details — whatever a proposal of yours always carries. They matter more than they look: the writer is TOLD about these lines so it never proposes them itself, which is why they belong here and not in the draft.",
+    "oneLine": "One line per line. Blank lines are dropped.",
+    "sections": "What it prints · {n} sections",
+    "sectionsNote": "These are the draft's own section keys, which is what makes pouring a copy rather than a mapping. They are not editable here on purpose — a template naming a key the draft does not have prints nothing for it, which is right for a template that outlived a schema change and wrong to hand somebody a free-text box for. A dot marks a section that is dropped when the meeting left it empty.",
+    "save": "Save this template",
+    "saved": "Saved."
   }
 }

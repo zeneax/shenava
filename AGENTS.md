@@ -63,8 +63,14 @@ one that works in both places. `tsconfig.json` sets
 
 The same constraint is why pure logic must not live in a module marked
 `server-only`: that package does not resolve outside Next, so anything importing
-it is unreachable from a test. `lib/meetings/ceiling.ts` and
-`lib/settings-shape.ts` exist because of it.
+it is unreachable from a test. `lib/meetings/ceiling.ts`,
+`lib/settings-shape.ts` and `lib/meetings/proposal-guide.ts` exist because of it,
+and `docx.ts` and `print.ts` carry a comment saying why they are deliberately not
+marked. The test that builds a real .docx and reads its XML back found a bug the
+typecheck could not: the draft's own title was not reaching the document.
+
+Mark a module `server-only` when it holds a key, a database client, or a
+`next/*` import — not because it happens to run on the server today.
 
 ## Before you commit
 

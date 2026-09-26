@@ -31,6 +31,8 @@ export type Meeting = {
   dialogue: unknown;
   notes: unknown;
   draftStatus: "pending" | "approved" | "rejected";
+  proposalId: string | null;
+  templateId: string | null;
   costUsd: number;
   createdAt: string;
   pieces: Piece[];
@@ -46,7 +48,7 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
   const { data: row } = await supabase
     .from("shenava_meetings")
     .select(
-      "id,title,client_name,language,audio_name,audio_bytes,audio_sha256,duration_ms,status,transcript,dialogue,notes,draft_status,cost_usd,created_at",
+      "id,title,client_name,language,audio_name,audio_bytes,audio_sha256,duration_ms,status,transcript,dialogue,notes,draft_status,proposal_id,template_id,cost_usd,created_at",
     )
     .eq("id", id)
     .maybeSingle();
@@ -85,6 +87,8 @@ export async function readMeeting(id: string): Promise<Meeting | null> {
     dialogue: row.dialogue,
     notes: row.notes,
     draftStatus: row.draft_status,
+    proposalId: row.proposal_id,
+    templateId: row.template_id,
     costUsd: Number(row.cost_usd ?? 0),
     createdAt: row.created_at,
     pieces,
