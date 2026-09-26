@@ -159,9 +159,17 @@ month, and every call is a row in a ledger you can read.
 ```
 db/        01_schema.sql, 02_seed.sql — paste into the Supabase SQL Editor
 prompts/   PRD.md, PRD.fa.md, BUILD-PROMPT.md — the spec, and the prompt that builds it
-docs/      notes on things that were hard to find
+docs/      the journey of a file, and notes on things that were hard to find
 src/       the application
+tests/     node --test; the audio layer is covered
 ```
+
+**If you are about to change how the audio is cut, read
+[`docs/the-journey-of-a-file.md`](docs/the-journey-of-a-file.md) first** (or
+[the Persian edition](docs/the-journey-of-a-file.fa.md)). It walks one recording
+from the moment it is chosen to the moment a draft is waiting, with every number
+and the reason for it — including the three ways a piece comes back wrong, which
+are most of what that code is for.
 
 ---
 
