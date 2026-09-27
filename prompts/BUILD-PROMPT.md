@@ -6,7 +6,14 @@ sufficient on its own: everything the agent needs to decide is decided here, and
 where a number matters the number is given.
 
 If you only want to understand the product, read [`PRD.md`](PRD.md) instead.
-This file is the instruction; that one is the specification.
+This file is the instruction; that one is the specification. The Persian edition
+of this instruction is [`BUILD-PROMPT.fa.md`](BUILD-PROMPT.fa.md), and it is
+written as Persian rather than translated — either one on its own builds the
+same application.
+
+This file is kept in step with the repository it built. Everything below
+describes Shenava as it now stands, including the four or five decisions that
+were made differently once and corrected.
 
 ---
 
@@ -21,12 +28,21 @@ This file is the instruction; that one is the specification.
 >
 > ### Stack, fixed
 >
-> Next.js (App Router, TypeScript, React Server Components), Tailwind CSS,
+> Next.js 16 (App Router, TypeScript, React Server Components), Tailwind CSS 4,
 > Supabase Postgres reached through `@supabase/supabase-js` with the service
 > role key on the server only, `next-intl` for Persian and English with Persian
 > as the default and right-to-left, `zod` for every payload boundary, the `docx`
 > package for Word output, `lucide-react` for icons, and
 > `@mazarix/voice-kernel` from npm (MIT) for the transcription constants.
+>
+> Two things about Next 16 in particular: the request-time middleware file is
+> now `src/proxy.ts`, not `middleware.ts` — the convention was renamed, while
+> the import stays `next-intl/middleware`, because next-intl has no `/proxy`
+> entry point. And read the guides under `node_modules/next/dist/docs/` rather
+> than working from memory of an older version; several conventions moved.
+>
+> Run the dev server on **port 3100**, not 3000, so it does not collide with
+> whatever else the person has running.
 >
 > Model calls go to **OpenRouter** over its OpenAI-compatible chat completions
 > endpoint. One key, `OPENROUTER_API_KEY`. Do not add a provider SDK.
@@ -47,9 +63,9 @@ This file is the instruction; that one is the specification.
 > tail of the chunk before it. A wrong answer must only ever be a wrong label.
 >
 > **Pass three, the draft.** A model reads the labelled dialogue and writes the
-> proposal draft under the eleven headings listed below, **in both languages at
-> once**, as finished formal sentences that could stand in the proposal
-> unchanged. Then it stops: the draft is `pending` and a person decides.
+> proposal draft under the headings listed below, **in both languages at once**,
+> as finished formal sentences that could stand in the proposal unchanged. Then
+> it stops: the draft is `pending` and a person decides.
 >
 > ### Pass one in detail — this is the part that is not obvious
 >
@@ -80,6 +96,10 @@ This file is the instruction; that one is the specification.
 > like an error), and **disable the mode with a visible sentence** when
 > `AudioEncoder` is absent or cannot do Opus, which is Safari's case. Do not
 > offer it and fail.
+>
+> **Mode B is the default and is offered first**, because it is what a real
+> meeting wants; a browser with no Opus encoder falls back to mode A, since the
+> default must never be the disabled option.
 >
 > **Every tuned number in this pipeline comes from `@mazarix/voice-kernel` and
 > nothing may hard-code one.** The prompt, the retry policy, the timeout curve,
@@ -114,6 +134,24 @@ This file is the instruction; that one is the specification.
 > half again the room. Do not parse what was never finished: a truncated JSON
 > reads as "unreadable" and sends you looking in the wrong place.
 >
+> ### Every seat's output ceiling is computed, and lives in one testable file
+>
+> This is the same mistake made three times, so make it impossible once. Put
+> `outputCeilingFor(durationMs, floor)`, `spansCeilingFor(sentences, floor)` and
+> `ceilingFor(promptLength, floor)` in **one file with no imports at all** —
+> because the modules that call them are marked `server-only`, and `server-only`
+> does not resolve outside Next, which would put these numbers beyond the reach
+> of a test. Scale the transcriber by the audio (about 40 output tokens a second
+> of speech), the speaker pass by the sentence count (about 40 a sentence), and
+> the writer by the length of what it was given (about a token a character),
+> each never below the configured floor and never above one hard maximum.
+>
+> An answer stopped at its ceiling does not arrive labelled as such. It arrives
+> as a truncated transcript that reads like bad dictation, or as half a JSON
+> object that reads as "this model does not return reliable JSON". Both send you
+> to the model settings; neither is the model. The tell is in the ledger:
+> `tokens_out` of exactly the configured ceiling, twice, to the token.
+>
 > ### Audio is never stored
 >
 > Not in the database, not in object storage, not on disk. The browser decodes
@@ -121,6 +159,13 @@ This file is the instruction; that one is the specification.
 > transcribes it and forgets it; the whole file is never uploaded anywhere. The
 > **text** is stored, deliberately, because the text is the product. Say both
 > sentences in the README.
+>
+> One consequence you must build rather than apologise for: sending starts on
+> the create page, while the samples are still in that page's memory, so the
+> file is chosen exactly once on the ordinary path. If the tab was closed and
+> the meeting is reopened with pieces still pending, ask for **the same file**
+> again and check its sha256 against the one on the meeting row before sending a
+> byte. Say why the second ask happens.
 >
 > ### The database
 >
@@ -130,7 +175,9 @@ This file is the instruction; that one is the specification.
 > **`shenava_settings`**, one row id 1 — the studio's name in both scripts and
 > its voice as free text; the transcriber's model, fallback model and output
 > ceiling; the writer's model, temperature and output ceiling; a daily and a
-> monthly dollar ceiling; retention in days.
+> monthly dollar ceiling; retention in days. Default the transcriber to a fast
+> multimodal model and the writer to one with judgement — the seats want
+> different models, which is why they have separate columns rather than one.
 >
 > **`shenava_meetings`** — title, client name, language; the audio's *shape*
 > (name, bytes, sha256, duration, piece count) but never the audio; transcript;
@@ -159,6 +206,11 @@ This file is the instruction; that one is the specification.
 > **`shenava_proposals`** — what an approved draft becomes: a number, a
 > language, a client, and the template's sections filled in.
 >
+> Three functions beside them: `shenava_spend_status()`, read before every model
+> call; `shenava_cost_by_seat(days)` for reading the ledger back; and
+> `shenava_clear_out()`, which drops meetings past `retention_days`, where zero
+> means keep forever. Plus a touch trigger for `updated_at`.
+>
 > Enable Row Level Security on all six and write **no policies**, which locks
 > the anon key out of everything; all access is server-side through the service
 > role key. Ship the DDL as `db/01_schema.sql`, idempotent, paste-able into the
@@ -177,10 +229,13 @@ This file is the instruction; that one is the specification.
 > the call succeeded or not — a failed call that consumed tokens still cost
 > money. Default the ceilings to $3 a day and $30 a month.
 >
-> ### The draft's eleven sections
+> ### The draft's sections
 >
-> In this order, with these headings in both languages, and each wanting exactly
-> what is described:
+> Two keys settle what the document is — `title`, the engagement in a few words,
+> and `engagement`, one of `project|consulting|training|retainer|unknown`, which
+> is what chooses the suggested template. Then **eleven sections**, in this
+> order, with these headings in both languages, each wanting exactly what is
+> described:
 >
 > `summary` — «خلاصهٔ پیشنهاد» / Summary. Two or three sentences: what the
 > client needs, what is proposed, and what is different for them afterwards.
@@ -195,7 +250,8 @@ This file is the instruction; that one is the specification.
 >
 > `phases` — «مراحل و زمان‌بندی» / Phases and timeline. The stages the
 > consultant proposed and the client accepted, each a title and a line of
-> detail, with a `when` only if the meeting settled it.
+> detail, with a `when` only if the meeting settled it — plus a `scheduleNote`,
+> one line on the overall timing, only if it was discussed.
 >
 > `method` — «روش اجرا، مشارکت و پشتیبانی» / How we work, together, and
 > afterwards. Discovery, iterations, what the client's side provides, how
@@ -224,6 +280,17 @@ This file is the instruction; that one is the specification.
 > The model writes the facts **first**, then both editions from that list and
 > from nothing else.
 >
+> Three sections a proposal also prints are deliberately **not** here: why us,
+> the terms, and the priced packages. Those are the studio's own lines, they
+> live on the template as house lines, and the writer is told about them so it
+> never proposes them itself.
+>
+> The notes keys are the template's section keys, so pouring an approved draft
+> into a template is a copy and not a mapping. Clamp every length rather than
+> rejecting: a model cannot count characters, least of all in Persian, and a
+> good set of notes with one over-long line is a good set of notes. A missing
+> section arrives empty rather than failing the parse.
+>
 > ### The writer's rules, which go in its prompt
 >
 > Every line under a section is a finished, formal, fluent sentence that could
@@ -232,7 +299,9 @@ This file is the instruction; that one is the specification.
 > **Never invent a price, a timeline, a percentage, a headcount or a deadline.**
 > A number that was said is kept exactly; a number that was not said means the
 > section stays quieter and the question goes to `openQuestions`. This is the
-> rule the whole product is judged on.
+> rule the whole product is judged on — so put the wording of it in a file with
+> no imports, and have a test assert the phrasing, so that softening it has to
+> be a deliberate act with a failing test in front of it.
 >
 > Read the **client's** lines for understanding, goals, budget and exclusions,
 > and the **consultant's** lines for phases, method and deliverables — and write
@@ -264,14 +333,17 @@ This file is the instruction; that one is the specification.
 > to the sample meeting; and two buttons — open the dashboard, and fork it.
 > Animate it: a waveform resolving into lines of text, the three passes arriving
 > on scroll, counters that count. Make it good; it is the first thing anyone
-> sees and the reason they fork it.
+> sees and the reason they fork it. Point the fork button at the repository
+> itself, and check where it lands — a fork URL that is one path segment wrong
+> opens an empty page and nobody reports it.
 >
 > **`/app` — meetings.** The list: title, client, when, status, cost, draft
-> status. Newest first.
+> status. Newest first. A meeting can be deleted from here, with a confirmation.
 >
 > **`/app/new` — new meeting.** Title, client, language, mode, file. Choosing
 > the file plans the cuts **in the browser** and shows what it will do — "7
-> pieces, about 4 minutes" — before anything is sent.
+> pieces, about 4 minutes" — before anything is sent. Sending then starts on
+> this same page: the samples are already here, so the file is chosen once.
 >
 > **`/app/m/[id]` — one meeting**, the working surface, revealed in stages:
 > the pieces as a strip with their state while it transcribes; the transcript
@@ -304,23 +376,53 @@ This file is the instruction; that one is the specification.
 > read from the environment and shown as *set* or *missing*, **never their
 > values**, with a **test** button that really calls all three and answers green
 > or red per line; and the schema file to paste, with a check for whether the
-> tables exist yet.
+> tables exist yet. This page must repeat every check the setup script makes,
+> because it is where a person goes when something stops working later.
 >
 > **`/app/templates`** — the built-in template and your own: sections, headings
 > in both languages, house lines.
 >
-> ### Keys and the door
+> ### Keys, the setup script, and the door
 >
 > No key in code, in the database, or in the browser.
 > `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
-> `OPENROUTER_API_KEY` are required; `APP_PASSWORD` is optional and **empty by
-> default**, meaning no login at all — which is correct on `localhost`, where
-> the only person who can open the page is the person sitting at the machine.
-> Put the whole decision of "who is asking" in one function in one file, so that
-> real accounts can be added later without touching anything else. In the README,
-> say plainly: leave it empty locally; set it before putting this on a public
-> domain, because a public deployment carries your own OpenRouter key and anyone
-> who opens the record page is spending your money. Ship `.env.example`.
+> `OPENROUTER_API_KEY` are required; `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+> `OPENROUTER_APP_NAME` and `OPENROUTER_APP_URL` are optional. Ship
+> `.env.example` with every one of them and a comment saying what it is for.
+>
+> **Write a setup script**, `npm run setup`, and make it the whole of
+> configuration. It asks for one value at a time and **tests each answer against
+> the real service before asking the next question** — fetches the Supabase
+> project, tries the service key against a real table, counts the six tables and
+> stops to have the two SQL files pasted if they are missing, calls OpenRouter
+> and prints the remaining credit. It writes `.env.local` only at the end, after
+> showing every value it is about to write — a key as `set · 219 characters`,
+> never the key itself — and it never prints a key back. Re-running it keeps
+> every answer the person does not change.
+>
+> The reason for the script rather than "edit this file": a wrong value in an
+> environment file is not discovered when it is written. It is discovered later,
+> as a page that will not load, at which point the file looks perfectly
+> reasonable and you are debugging the wrong half of the problem.
+>
+> **The door.** `APP_PASSWORD` is empty by default, meaning no login at all,
+> which is correct on `localhost`: the only person who can open the page is the
+> person sitting at the machine. Put the whole decision of "who is asking" in one
+> function in one file — `allowed()` in `lib/auth.ts` — so that real accounts can
+> be added later without touching anything else.
+>
+> Be honest about what a half-built door does. If `allowed()` demands a signed
+> session cookie whenever `APP_PASSWORD` is set, and you have not built a
+> sign-in page that issues one, then setting it does not protect anything: it
+> refuses every write and leaves no way in. So either write the sign-in page, or
+> say plainly — in `.env.example`, in the README, and by having the setup script
+> write it empty without offering to set it — that this build has no login and
+> the variable must stay empty until one exists. Keep `sessionCookie()` written
+> and exported, so the page that is missing has something to mint from.
+>
+> Then say the rest of it plainly in the README: a public deployment carries your
+> own OpenRouter key, and anyone who opens the record page is spending your
+> money, so write the door before deploying rather than after.
 >
 > ### Design
 >
@@ -335,27 +437,72 @@ This file is the instruction; that one is the specification.
 > widens instead. Give any such scroller `position: relative`.
 >
 > Both message catalogues must hold the same key set, and nothing user-facing
-> may be a string literal in a component.
+> may be a string literal in a component. A key whose value is an object cannot
+> be asked for as a string: `t("mode")` beside a `mode: { … }` block throws at
+> render while the page still answers 200, so give the label its own key.
+>
+> Three failures on this side answer 200 and look like nothing, so build against
+> them from the start: a Tailwind 4 arbitrary value the browser discards without
+> a word; a navigation into a dynamic route that shows no sign of having been
+> clicked because there is no `loading.tsx` above it; and a long await inside
+> `useTransition`, which entangles every navigation in the application. Add a
+> headless-browser script that opens each page and reports anything that
+> rejects, and an `instrumentation-client.ts` that catches a rejection whose
+> value is not an `Error` before Next's overlay coerces it into
+> `[object Object]` with the handler's own stack — in development only, and
+> ignoring what a browser extension injected, because the first hour of that was
+> spent on a wallet extension's JSON-RPC error.
+>
+> ### How the tests are run, and what that constrains
+>
+> `npm test` is `node --test tests/*.test.ts` — run directly against the
+> TypeScript, with no bundler in front of it. Two consequences shape the layout
+> of `src/lib`:
+>
+> A relative import inside `src/lib` **carries its `.ts` extension**
+> (`from "./text.ts"`), because node's ESM resolver does not guess one.
+> Turbopack and `tsc` both accept the explicit form, so set
+> `allowImportingTsExtensions` in `tsconfig.json` and use it everywhere.
+>
+> Pure logic must not live in a module marked `server-only`: that package does
+> not resolve outside Next, so anything importing it is unreachable from a test.
+> Mark a module `server-only` when it holds a key, a database client or a
+> `next/*` import — not because it happens to run on the server today. The
+> ceilings, the settings shape, the proposal guide, the Word writer and the
+> print sheet are all outside it for exactly this reason.
+>
+> Aim for about a hundred tests and no browser or network in any of them. Have
+> one of them build a real .docx and read its XML back: that test found a bug
+> the typecheck could not — the draft's own title was not reaching the document.
 >
 > ### Order of work
 >
 > 1. The project, the environment example, the schema and the seed, the
->    connections page. Stop here and confirm it runs and the sample meeting
->    renders with no OpenRouter key set.
+>    connections page. Stop here and confirm it runs on port 3100 and the sample
+>    meeting renders with no OpenRouter key set.
 > 2. The pure logic, with unit tests as you go: the splitter and the quietest
 >    cut; the WAV writer and the byte-level halving; the Opus encoder and the
 >    Ogg container and its page-level halving; the sentence cutter and
 >    ranges-to-turns and the two splitters; the notes schema and its section
->    merge; Word and the print sheet.
+>    merge; the ceilings; Word and the print sheet.
 > 3. The server: the OpenRouter client, the price table, the spend check and the
 >    ledger, the transcription call with its three failure handlers, the speaker
->    pass, the writer, one-section rewrite, and the five routes.
+>    pass, the writer, one-section rewrite, and the routes.
 > 4. The dashboard: list, new, the meeting page with all three stages, settings,
 >    templates.
 > 5. The landing page and its animation.
-> 6. The README, and a `docs/` note for each thing that took you more than an
->    hour to find — the symptom, what it actually was, and the command that
->    would find it again.
+> 6. The setup script, and the README written around it — three commands, then
+>    the questions the script asks, in the order it asks them.
+> 7. A `docs/` note for each thing that took more than an hour to find: the
+>    symptom as it appeared, what it actually was, and the command that would
+>    find it again. The last part is the point. Then a walkthrough of one
+>    recording from chosen to drafted, with every number and the reason for it,
+>    which is the document to read before touching the cutting code.
+> 8. The Persian editions: the README, the walkthrough, and this instruction.
+>    Each written as Persian, not translated. GitHub renders a README in a font
+>    stack with no Persian glyphs and its sanitiser strips `style`, so if the
+>    Persian edition matters, give it a page of its own in a readable face and
+>    link to it.
 >
 > ### What proves it is done
 >
@@ -364,8 +511,8 @@ This file is the instruction; that one is the specification.
 > reason. A filtered piece produces two halved requests and a piece row that
 > says so. The draft contains no figure the transcript does not contain.
 > Approving pours the draft into the template and produces a numbered proposal.
-> Both catalogues hold the same keys, and no Persian page scrolls sideways at
-> 320 pixels.
+> `npm run typecheck && npm test` is green. Both catalogues hold the same keys,
+> and no Persian page scrolls sideways at 320 pixels.
 
 ---
 
@@ -373,11 +520,16 @@ This file is the instruction; that one is the specification.
 
 It is long on purpose. Every paragraph that reads like an over-specification is
 a thing that was got wrong once: the safety filter, the output ceiling on long
-pieces, the Ogg container, the editing splitter gluing «بله» onto its neighbour,
-the absolutely positioned label widening the page. An agent given the short
-version of this prompt will write something that looks right and fails on real
-audio.
+pieces — three times, in three seats — the Ogg container, the editing splitter
+gluing «بله» onto its neighbour, the absolutely positioned label widening the
+page, the half-built door that locks you out, the overlay whose whole message
+was `[object Object]`. An agent given the short version of this prompt will
+write something that looks right and fails on real audio.
 
 The one thing you should change before running it is the **stack**, if you do
 not want Next.js and Supabase. The three passes, the two cutting modes and the
 failure handling are the product; the framework is not.
+
+The rules an agent working *inside* the finished repository has to know are a
+different document: [`AGENTS.fa.md`](AGENTS.fa.md) in Persian, and
+[`AGENTS.md`](../AGENTS.md) at the root of the repository in English.
