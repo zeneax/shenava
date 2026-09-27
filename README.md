@@ -8,6 +8,8 @@ Fork it, run it locally, drop in an audio file, read the proposal it writes.
 
 **[نسخهٔ فارسی ←](README.fa.md)** · [read it in a Persian face](https://zeneax.github.io/shenava/)
 
+![Shenava — the landing page](docs/images/landing-en.png)
+
 > **Status: complete, and taken end to end on a real recording** — chosen,
 > cut, transcribed, told apart by speaker, and drafted. The unit suite and the
 > typecheck are green. If something breaks on your own audio, [open an

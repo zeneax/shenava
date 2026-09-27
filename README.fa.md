@@ -8,6 +8,8 @@
 
 **[English edition ←](README.md)**
 
+![صفحهٔ نخست شنوا — نسخهٔ فارسی](docs/images/landing-fa.png)
+
 > **این صفحه را GitHub با فونتی نشان می‌دهد که گلیف فارسی ندارد** — هیچ چیزی در
 > خود فایل نمی‌تواند عوضش کند، چون sanitizer گیت‌هاب `style` را حذف می‌کند. اگر
 > خواندنش سخت است، **[همین راهنما با فونت Vazirmatn ←](https://zeneax.github.io/shenava/)**.

@@ -67,10 +67,12 @@
     background: var(--paper);
     color: var(--ink);
     font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
-    /* Persian letterforms carry more ink than Latin ones and need the room:
-       a line height that looks generous in English looks tight here. */
-    font-size: 1.0625rem;
-    line-height: 2.05;
+    /* Persian letterforms carry more ink than Latin ones and need the room —
+       in size as well as in leading. A body size that reads as comfortable in
+       English is small here, because the marks that tell letters apart are
+       below the size where they separate. Nineteen pixels, not sixteen. */
+    font-size: 1.1875rem;
+    line-height: 2;
     font-weight: 400;
   }
 
@@ -87,10 +89,10 @@
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    font-size: 0.9rem;
+    font-size: 1rem;
   }
   .bar a { color: var(--ink-soft); }
-  .bar .name { color: var(--cool); font-size: 1.05rem; font-weight: 500; }
+  .bar .name { color: var(--cool); font-size: 1.15rem; font-weight: 500; }
   .bar nav { display: flex; gap: 1rem; }
 
   main {
@@ -104,15 +106,15 @@
   a:hover { text-decoration-thickness: 2px; }
 
   h1, h2, h3, h4 { line-height: 1.5; font-weight: 700; }
-  h1 { font-size: 2rem; margin: 0 0 1.5rem; }
+  h1 { font-size: 2.25rem; margin: 0 0 1.5rem; }
   h2 {
-    font-size: 1.45rem;
+    font-size: 1.65rem;
     margin: 3rem 0 1rem;
     padding-block-end: 0.5rem;
     border-block-end: 1px solid var(--line);
   }
-  h3 { font-size: 1.15rem; margin: 2.25rem 0 0.75rem; }
-  h4 { font-size: 1rem; margin: 1.75rem 0 0.5rem; color: var(--ink-soft); }
+  h3 { font-size: 1.3rem; margin: 2.25rem 0 0.75rem; }
+  h4 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; color: var(--ink-soft); }
 
   p, ul, ol { margin: 0 0 1.15rem; }
   li { margin-block-end: 0.5rem; }
@@ -160,7 +162,7 @@
     position: relative;
     overflow-x: auto;
     line-height: 1.7;
-    font-size: 0.88rem;
+    font-size: 0.95rem;
   }
   /* Inside a `pre` the opposite is wanted: the block scrolls, so a command
      must stay on the one line it was written on. */
@@ -170,7 +172,7 @@
     width: 100%;
     border-collapse: collapse;
     margin: 1.5rem 0;
-    font-size: 0.95rem;
+    font-size: 1rem;
   }
   th, td {
     border: 1px solid var(--line);
@@ -179,7 +181,14 @@
   }
   th { background: var(--paper-raised); font-weight: 500; }
 
-  img { max-width: 100%; }
+  img {
+    max-width: 100%;
+    height: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    display: block;
+    margin: 1.75rem 0;
+  }
 
   .state {
     color: var(--ink-faint);
@@ -260,9 +269,36 @@
     .then((markdown) => {
       // The document already carries its own `dir` wrappers for GitHub, and
       // this page is right-to-left from the root, so they simply agree.
-      document.getElementById("doc").innerHTML = marked.parse(markdown);
+      const doc = document.getElementById("doc");
+      doc.innerHTML = marked.parse(markdown);
+
+      /**
+       * The document was written to be read from the repository root, so every
+       * relative path in it — `db/01_schema.sql`, `docs/images/…`, `../../issues`
+       * — means something there and nothing here, where the site root is the
+       * `docs` folder. Left alone they all answer 404.
+       *
+       * `new URL` resolves them against the place they were written for, which
+       * also gets `../../issues` right without a special case. Links go to the
+       * repository; images have to come from raw, because a `blob` page is HTML.
+       */
+      const blob = `https://github.com/${owner}/${repo}/blob/main/`;
+      const rawRoot = `https://raw.githubusercontent.com/${owner}/${repo}/main/`;
+      const external = (value) => /^(https?:|mailto:|#|data:)/.test(value);
+
+      for (const a of doc.querySelectorAll("a[href]")) {
+        const href = a.getAttribute("href");
+        if (external(href)) continue;
+        a.href = new URL(href, blob).href;
+      }
+      for (const img of doc.querySelectorAll("img[src]")) {
+        const src = img.getAttribute("src");
+        if (external(src)) continue;
+        img.src = new URL(src, rawRoot).href;
+      }
+
       // The title is the page's own; the one in the document would repeat it.
-      const first = document.querySelector("#doc h1");
+      const first = doc.querySelector("h1");
       if (first) first.remove();
     })
     .catch((error) => {
