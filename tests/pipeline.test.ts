@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { implausiblyShort, assembleTranscript, continuation } from "../src/lib/meetings/assemble.ts";
 import { costOf, PRICES } from "../src/lib/llm/pricing.ts";
-import { outputCeilingFor } from "../src/lib/meetings/ceiling.ts";
+import { outputCeilingFor, spansCeilingFor } from "../src/lib/meetings/ceiling.ts";
 import { SETTING_DEFAULTS } from "../src/lib/settings-shape.ts";
 
 test("a minute of speech answered in two words is recognised as not an answer", () => {
@@ -84,4 +84,29 @@ test("the output ceiling grows with the piece and never falls below the floor", 
   const long = outputCeilingFor(9 * 60_000, floor);
   assert.ok(long > floor * 4, `nine minutes got ${long} against a floor of ${floor}`);
   assert.ok(long <= 64_000);
+});
+
+test("the speaker pass asks for more room than the 4,000 that truncated a real meeting", () => {
+  // The run that failed: 187 sentences in one chunk, against a flat 4,000. Both
+  // attempts stopped at the ceiling — the ledger recorded tokens_out of exactly
+  // 8,000 — and a half-written JSON object was reported as the model not
+  // returning reliable JSON. With no floor at all, the sentence count alone has
+  // to carry it past where it broke.
+  assert.ok(
+    spansCeilingFor(187, 0) > 4000,
+    `187 sentences asked for ${spansCeilingFor(187, 0)}, which is what already failed`,
+  );
+  // And it has to clear the answer that succeeded, with room over: 163
+  // sentences came back in 3,344 output tokens.
+  assert.ok(spansCeilingFor(163, 0) > 3344 * 1.5);
+});
+
+test("a ceiling never falls below its floor, and never runs away", () => {
+  // The floor is the reader's own setting; a short chunk must not quietly ask
+  // for less than they configured.
+  assert.equal(spansCeilingFor(1, 12_000), 12_000);
+  assert.equal(outputCeilingFor(1000, 12_000), 12_000);
+  // And nothing asks for more than the hard maximum, whatever the arithmetic.
+  assert.equal(spansCeilingFor(100_000, 0), 64_000);
+  assert.equal(outputCeilingFor(3 * 60 * 60_000, 0), 64_000);
 });

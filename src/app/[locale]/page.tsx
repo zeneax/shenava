@@ -88,7 +88,7 @@ export default async function Landing({ params }: { params: Promise<{ locale: st
           {passes.map(({ key, icon: Icon }, i) => (
             <article
               key={key}
-              className="rise rounded-[--radius-panel] p-6"
+              className="rise rounded-(--radius-panel) p-6"
               style={{
                 background: "var(--paper-raised)",
                 border: "1px solid var(--line)",

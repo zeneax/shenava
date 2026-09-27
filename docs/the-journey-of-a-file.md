@@ -211,6 +211,18 @@ one recording.
 The meeting row holds the *shape* of the audio and never the audio: name,
 bytes, sha256, duration, piece count.
 
+**The rows are written and the sending begins, on the same page, without a
+second look at the file.** The samples are still in the create form's ref —
+they were decoded there — so the handoff is a function call, not a navigation.
+The listener on the meeting page exists for the other case only: the tab was
+closed, or this is another machine, and the samples really are gone. Asking for
+the recording a second time when the browser is still holding it buys the
+privacy claim nothing and costs the person a step they cannot explain.
+
+The cadence itself is one function, `lib/meetings/send.ts`, used by both. Two
+copies of a send loop drift, and the symptom of a drifted copy is a piece that
+was never sent under a progress display that says it was.
+
 ---
 
 ## ⑦⑧⑨ The rhythm — one piece at a time

@@ -7,6 +7,7 @@ import {
   type Dialogue, type Identity, type Speaker,
 } from "./dialogue-schema.ts";
 import { ask, loadMaterial, openSeat, record, retryNote, MATERIAL_GUARD, type Refusal } from "./seat.ts";
+import { spansCeilingFor } from "./ceiling.ts";
 import { getSettings } from "@/lib/settings";
 
 /**
@@ -33,7 +34,7 @@ export type SpeakersResult =
   | { ok: true; dialogue: Dialogue; model: string; costUsd: number; sentences: number }
   | { ok: false; reason: Refusal };
 
-/** About twenty minutes of speech per chunk; the answer is a few hundred tokens whatever the input. */
+/** About twenty minutes of speech per chunk. */
 export const CHUNK_CHARS = 16_000;
 
 /**
@@ -115,6 +116,8 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
   let identities: { consultant: Identity; client: Identity } | null = null;
   const labels: Speaker[] = [];
   let failure: Refusal | null = null;
+  /** The verdict behind `failure`, kept for the ledger. */
+  let why = "";
 
   for (const chunk of chunks) {
     // What the model is shown of what came before: the label the last sentence
@@ -141,10 +144,14 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
     let problem = "";
     let parsed: ReturnType<typeof SpansAnswerSchema.safeParse> | null = null;
 
+    // Sized to the chunk, and not a constant — see `spansCeilingFor` for the
+    // failure that flat 4,000 produced and how the ledger showed it.
+    let ceiling = spansCeilingFor(chunk.to - chunk.from + 1, settings.writerMaxOutputTokens);
+
     // Two attempts. The second carries the first one's verdict, because "answer
     // again" without saying what was wrong usually produces the same answer.
     for (let attempt = 1; attempt <= 2 && !parsed?.success; attempt += 1) {
-      const answer = await ask(seat, attempt === 1 ? prompt : prompt + retryNote(problem), 4000);
+      const answer = await ask(seat, attempt === 1 ? prompt : prompt + retryNote(problem), ceiling);
       if ("failed" in answer) {
         problem = answer.reason;
         continue;
@@ -154,9 +161,17 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
       totals.costUsd += answer.costUsd;
       totals.ms += answer.ms;
 
+      if (answer.cutOff) {
+        // Half again the room, and do not read what was never finished: a
+        // retry at the same ceiling is the same failure at the same cost.
+        ceiling = Math.min(64_000, Math.ceil(ceiling * 1.5));
+        problem = "it was cut off before the JSON closed";
+        continue;
+      }
+
       const object = readLastJson(answer.text);
       if (object === null) {
-        problem = answer.cutOff ? "it was cut off before the JSON closed" : "no JSON object in it";
+        problem = "no JSON object in it";
         continue;
       }
       const candidate = SpansAnswerSchema.safeParse(object);
@@ -169,6 +184,7 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
 
     if (!parsed?.success) {
       failure = problem.length > 0 ? "unreadable" : "transport";
+      why = problem;
       break;
     }
 
@@ -190,7 +206,9 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
     totals,
     failure === null,
     `${sentences.length} sentences, ${chunks.length} chunk(s)`,
-    failure ?? undefined,
+    // The reason and the verdict that produced it. "unreadable" alone cannot
+    // tell a cut-off answer from a wrong shape, and those want opposite fixes.
+    failure ? (why ? `${failure}: ${why}` : failure) : undefined,
   );
 
   if (failure) return { ok: false, reason: failure };

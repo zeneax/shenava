@@ -145,6 +145,164 @@ h1, h2, h3, h4 { font-weight: 500; letter-spacing: -0.01em; }
   }
 }
 
+/* ── The small controls ────────────────────────────────────────────────────
+   A chip is an action that sits beside text rather than under it: move this
+   turn to the other side, cut it into sentences, read one side alone. They
+   were caption-coloured text in a hairline pill eighteen pixels high — the
+   same weight as the label they sat next to, and nothing about them said
+   "press me". So they carry their own surface, a target you can hit on a
+   phone, and a hover that says what will happen before you commit to it.
+
+   `--tint` is the colour the action belongs to, set on the element: for a
+   move, the side the turn is going TO. The control wears its answer, so the
+   hover is the preview.                                                     */
+
+.chip {
+  --tint: var(--ink-soft);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-height: 2rem;
+  padding-inline: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 9999px;
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--ease-out-soft),
+    border-color 0.2s var(--ease-out-soft),
+    color 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft),
+    transform 0.2s var(--ease-out-soft);
+}
+
+/* Only where a pointer can actually hover. On a touch screen a :hover rule
+   sticks after the tap and the chip stays lit, which reads as selected. */
+@media (hover: hover) {
+  .chip:hover {
+    background: color-mix(in oklab, var(--tint) 12%, var(--paper-raised));
+    border-color: color-mix(in oklab, var(--tint) 60%, var(--line));
+    color: color-mix(in oklab, var(--tint) 75%, var(--ink));
+    transform: translateY(-1px);
+    box-shadow: 0 3px 12px -6px color-mix(in oklab, var(--tint) 70%, transparent);
+  }
+}
+
+.chip:active { transform: translateY(0) scale(0.97); }
+
+.chip:disabled {
+  opacity: 0.4;
+  pointer-events: none;
+  transform: none;
+  box-shadow: none;
+}
+
+/* A toggle that is on reads as filled, so "this turn is open" is visible from
+   across the page and not only from the row that appeared underneath. */
+.chip[aria-pressed="true"],
+.chip[aria-expanded="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+  box-shadow: none;
+}
+@media (hover: hover) {
+  .chip[aria-pressed="true"]:hover,
+  .chip[aria-expanded="true"]:hover {
+    background: color-mix(in oklab, var(--ink) 86%, var(--paper));
+    border-color: color-mix(in oklab, var(--ink) 86%, var(--paper));
+    color: var(--paper);
+    transform: translateY(-1px);
+  }
+}
+
+/* The dot is the destination side's colour — the sentence you are about to
+   move is going somewhere, and the somewhere has a colour everywhere else on
+   this page. */
+.chip-dot {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  flex: none;
+  border-radius: 9999px;
+  background: var(--tint);
+  transition: transform 0.2s var(--ease-out-soft);
+}
+@media (hover: hover) {
+  .chip:hover .chip-dot { transform: scale(1.4); }
+}
+
+/* Nudged toward the inline end, which is left in Persian. The arrow is drawn
+   pointing right, so RTL flips it and the nudge rides on the flipped axis. */
+.chip-arrow { transition: transform 0.2s var(--ease-out-soft); }
+[dir="rtl"] .chip-arrow { transform: scaleX(-1); }
+@media (hover: hover) {
+  .chip:hover .chip-arrow { transform: translateX(3px); }
+  [dir="rtl"] .chip:hover .chip-arrow { transform: scaleX(-1) translateX(3px); }
+}
+
+.chip-scissors {
+  transform-origin: 50% 70%;
+  transition: transform 0.2s var(--ease-out-soft);
+}
+@media (hover: hover) {
+  .chip:hover .chip-scissors { transform: rotate(-16deg); }
+}
+.chip[aria-expanded="true"] .chip-scissors { transform: rotate(-16deg); }
+
+/* ── A sentence you can move ───────────────────────────────────────────────
+   Inside an opened turn every sentence is a button, which the old flat box
+   did not admit. The tint is again the side it would move to, and the label
+   at the end says so in words — faintly on a touch screen, where there is no
+   hover to reveal it.                                                       */
+
+.sentence {
+  --tint: var(--ink-soft);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.625rem;
+  background: var(--paper-raised);
+  text-align: start;
+  cursor: pointer;
+  transition:
+    background-color 0.2s var(--ease-out-soft),
+    border-color 0.2s var(--ease-out-soft),
+    box-shadow 0.2s var(--ease-out-soft);
+}
+@media (hover: hover) {
+  .sentence:hover {
+    background: color-mix(in oklab, var(--tint) 10%, var(--paper-raised));
+    border-color: color-mix(in oklab, var(--tint) 55%, var(--line));
+    box-shadow: 0 3px 14px -8px color-mix(in oklab, var(--tint) 70%, transparent);
+  }
+}
+.sentence:active { background: color-mix(in oklab, var(--tint) 16%, var(--paper-raised)); }
+.sentence:disabled { opacity: 0.4; pointer-events: none; }
+
+.sentence-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--tint);
+  opacity: 0;
+  transition: opacity 0.2s var(--ease-out-soft);
+}
+/* No pointer to hover with: show it, quietly, all the time. */
+@media (hover: none) { .sentence-go { opacity: 0.75; } }
+@media (hover: hover) {
+  .sentence:hover .sentence-go,
+  .sentence:focus-visible .sentence-go { opacity: 1; }
+  .sentence:hover .chip-arrow { transform: translateX(3px); }
+  [dir="rtl"] .sentence:hover .chip-arrow { transform: scaleX(-1) translateX(3px); }
+}
+
 /* ── Right-to-left ─────────────────────────────────────────────────────────
    Logical properties do almost all of it. What is left is anything that must
    flip its drawing rather than its box. */

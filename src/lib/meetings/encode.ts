@@ -1,3 +1,4 @@
+import { describeError } from "../describe-error.ts";
 import { muxOpusOgg, OPUS_GRANULE_RATE, type OpusPacket } from "./ogg.ts";
 import { LONG_PIECE_BITRATE } from "./segments.ts";
 
@@ -98,7 +99,11 @@ export async function encodeOpusOgg(samples: Float32Array, sampleRate: number): 
   }
   await encoder.flush();
   encoder.close();
-  if (failure) throw failure;
+  // Wrapped, never rethrown as it came. `AudioEncoder` hands its error callback
+  // whatever it likes — a DOMException in Chrome, and not necessarily an Error
+  // at all — and a rejection that is not an Error reaches the development
+  // overlay as the word `[object Object]` with no stack worth reading.
+  if (failure) throw new Error(`opus encoder: ${describeError(failure)}`);
 
   packets.sort((a, b) => a.granule - b.granule);
   return muxOpusOgg(packets, { channels: 1, inputRate: sampleRate });

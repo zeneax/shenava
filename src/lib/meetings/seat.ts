@@ -5,6 +5,10 @@ import { costOf } from "@/lib/llm/pricing";
 import { withinCeiling, recordRun, type Seat as SeatName } from "@/lib/llm/spend";
 import { getSettings, type Settings } from "@/lib/settings";
 
+// Re-exported, not defined here: the arithmetic lives in `ceiling.ts`, which
+// no `server-only` import can reach into, so a test can hold it.
+export { ceilingFor } from "./ceiling.ts";
+
 /**
  * The writer's seat: the material it reads, the ceiling it is refused by, and
  * the one way it asks a question.
@@ -138,16 +142,4 @@ export async function record(
   error?: string,
 ): Promise<void> {
   await recordRun({ meetingId, seat, model, detail, ...totals, ok, error });
-}
-
-/**
- * How much room an answer needs, for a seat reading a whole meeting.
- *
- * About a token a character of input, with a floor — two editions of a long
- * meeting plus a fact list is more than any fixed ceiling, and this was found
- * the way such things are: a draft that failed twice at exactly the configured
- * 12,000 tokens, with a cut-off JSON that read as "unreadable".
- */
-export function ceilingFor(promptLength: number, floor: number): number {
-  return Math.max(floor, Math.min(64_000, Math.ceil(promptLength)));
 }

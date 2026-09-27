@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { timing } from "@mazarix/voice-kernel";
 import { useRouter } from "@/i18n/navigation";
@@ -17,6 +17,9 @@ import {
 import { canEncodeOpus } from "@/lib/meetings/encode";
 import { downsample, toMono } from "@/lib/meetings/wav-encode";
 import { createMeeting } from "@/lib/actions/meetings";
+import { sendPieces } from "@/lib/meetings/send";
+import { describeError } from "@/lib/describe-error";
+import { PieceMarks, type Mark } from "./piece-marks";
 import { FileAudio, Loader2, AlertTriangle, Scissors } from "lucide-react";
 
 /**
@@ -30,6 +33,13 @@ import { FileAudio, Loader2, AlertTriangle, Scissors } from "lucide-react";
  *
  * Nothing about the audio leaves this component. What is posted is the plan —
  * the piece boundaries in milliseconds — plus the file's shape and its hash.
+ *
+ * WHY IT SENDS THE PIECES HERE TOO. The samples are already decoded and held
+ * in this component, so the moment the rows exist the sending can begin. A
+ * first pass therefore asks for the recording exactly once. The listener on
+ * the meeting page asks again only when the samples are genuinely gone — a
+ * closed tab, another machine — which is what "the audio is never stored"
+ * actually costs, and no more than that.
  */
 
 type Plan = {
@@ -49,7 +59,7 @@ export function NewMeetingForm() {
   const [title, setTitle] = useState("");
   const [clientName, setClientName] = useState("");
   const [language, setLanguage] = useState<"farsi" | "english" | "auto">("auto");
-  const [mode, setMode] = useState<PieceMode>("minute");
+  const [mode, setMode] = useState<PieceMode>("long");
   const [opusReady, setOpusReady] = useState<boolean | null>(null);
 
   const samples = useRef<{ data: Float32Array; rate: number } | null>(null);
@@ -57,26 +67,60 @@ export function NewMeetingForm() {
   const [problem, setProblem] = useState<Problem>(null);
   const [reading, setReading] = useState(false);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const [saving, startSaving] = useTransition();
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [sending, setSending] = useState(false);
+  /**
+   * Creating the rows and sending the pieces are one motion to the person, and
+   * plain state is what holds it — NOT `useTransition`.
+   *
+   * That motion is an hour long on a long meeting. An await that long inside a
+   * transition entangles every other transition in the application, and every
+   * door in the rail navigates in one, so the whole dashboard stops answering
+   * its own links until the last piece lands. The symptom is not a slow page:
+   * it is a click that does nothing whatsoever — no skeleton, no lit door — for
+   * the length of the meeting, which reads as the browser having hung.
+   * `run-speakers.tsx` and `draft-view.tsx` keep their model calls out of a
+   * transition for the same reason; this is the longest await in the product
+   * and was the last one still inside one.
+   */
+  const [saving, setSaving] = useState(false);
+  const busy = saving || sending;
 
   /**
    * Ask the browser once, on mount, whether it can encode Opus at all. Safari
    * cannot, at the time of writing — so the long mode is disabled with a
    * sentence saying why rather than offered and failed halfway through an
-   * hour-long upload.
+   * hour-long upload. Long pieces are the default, so on such a browser the
+   * choice falls back to minute pieces: the default must never be the disabled
+   * one. Nothing is decoded yet at mount, so there is no plan to re-cut.
    */
   useEffect(() => {
     let alive = true;
-    void canEncodeOpus(timing.audio.sampleRate).then((ok) => {
-      if (alive) setOpusReady(ok);
-    });
+    void canEncodeOpus(timing.audio.sampleRate)
+      .then((ok) => {
+        if (!alive) return;
+        setOpusReady(ok);
+        if (!ok) setMode("minute");
+      })
+      // A browser that cannot answer the question has no encoder to offer.
+      .catch(() => {
+        if (!alive) return;
+        setOpusReady(false);
+        setMode("minute");
+      });
     return () => {
       alive = false;
     };
   }, []);
 
-  /** Re-cut what is already decoded. Changing mode must not re-read the file. */
-  const replan = useCallback(async (next: PieceMode, file?: { name: string; bytes: number; sha: string }) => {
+  /**
+   * Re-cut what is already decoded. Changing mode must not re-read the file.
+   *
+   * Deliberately not `async`: it awaits nothing, and an `async` function called
+   * from a click handler is a promise nobody catches — a throw inside one
+   * reaches the window instead of the error boundary.
+   */
+  const replan = useCallback((next: PieceMode, file?: { name: string; bytes: number; sha: string }) => {
     const held = samples.current;
     if (!held) return;
     const pieces = planSegments(held.data, held.rate, planOptionsFor(next));
@@ -111,7 +155,7 @@ export function NewMeetingForm() {
       for (let c = 0; c < decoded.numberOfChannels; c += 1) channels.push(decoded.getChannelData(c));
       const mono = downsample(toMono(channels), decoded.sampleRate, timing.audio.sampleRate);
       samples.current = { data: mono, rate: timing.audio.sampleRate };
-      await replan(mode, { name: file.name, bytes: file.size, sha });
+      replan(mode, { name: file.name, bytes: file.size, sha });
       if (!title) setTitle(file.name.replace(/\.[^.]+$/, ""));
     } catch {
       setProblem("undecodable");
@@ -124,29 +168,101 @@ export function NewMeetingForm() {
   };
 
   const chooseMode = (next: PieceMode) => {
+    if (busy) return;
     setMode(next);
-    void replan(next);
+    replan(next);
   };
 
-  const submit = () => {
-    if (!plan) return;
+  const mark = (idx: number, state: Mark["state"], note?: string) =>
+    setMarks((current) => current.map((m) => (m.idx === idx ? { ...m, state, note } : m)));
+
+  /**
+   * Whether this form is still on screen. Assigned on mount as well as cleared
+   * on unmount: in development the effects run twice, and a flag only cleared
+   * would read false for the whole life of the second mount.
+   */
+  const live = useRef(true);
+  useEffect(() => {
+    live.current = true;
+    return () => {
+      live.current = false;
+    };
+  }, []);
+
+  const submit = async () => {
+    const held = samples.current;
+    if (!plan || !held) return;
     setRefusal(null);
-    startSaving(async () => {
-      const result = await createMeeting({
-        title,
-        clientName,
-        language,
+
+    setSaving(true);
+    // Its own catch, because nothing above catches one any more: a transition
+    // surfaces a thrown action, a bare await swallows it into the console.
+    const result = await createMeeting({
+      title,
+      clientName,
+      language,
+      mode,
+      audioName: plan.name,
+      audioBytes: plan.bytes,
+      audioSha256: plan.sha256,
+      durationMs: plan.durationMs,
+      pieces: plan.pieces.map((p) => ({ idx: p.idx, startMs: p.startMs, endMs: p.endMs })),
+    }).catch((error: unknown) => ({
+      ok: false as const,
+      reason: "write-failed" as const,
+      detail: describeError(error),
+    }));
+    setSaving(false);
+    if (!result.ok) {
+      setRefusal(result.detail ? `${result.reason} — ${result.detail}` : result.reason);
+      return;
+    }
+
+    // The rows exist and the samples are still here, so the pieces go now.
+    setMarks(plan.pieces.map((piece) => ({ idx: piece.idx, state: "waiting" as const })));
+    setSending(true);
+    let broke = false;
+    try {
+      await sendPieces({
+        meetingId: result.id,
         mode,
-        audioName: plan.name,
-        audioBytes: plan.bytes,
-        audioSha256: plan.sha256,
-        durationMs: plan.durationMs,
-        pieces: plan.pieces.map((p) => ({ idx: p.idx, startMs: p.startMs, endMs: p.endMs })),
+        samples: held.data,
+        pieces: plan.pieces,
+        indices: plan.pieces.map((piece) => piece.idx),
+        mark,
       });
-      if (result.ok) router.push("/app");
-      else setRefusal(result.detail ? `${result.reason} — ${result.detail}` : result.reason);
-    });
+    } catch (error) {
+      /**
+       * A refused piece is not an exception — `sendPieces` marks it and carries
+       * on — so reaching here means the browser itself gave out: its Opus
+       * encoder, or the network under the request. Nothing above catches it any
+       * more, and an escaped rejection is a red overlay reading `[object
+       * Object]` rather than a sentence on the page.
+       */
+      broke = true;
+      setRefusal(describeError(error));
+    } finally {
+      setSending(false);
+    }
+
+    // Staying put on a break, unlike on a refusal: the reason is on this page
+    // and the samples are still in this component, so leaving would cost both.
+    if (broke) return;
+
+    // Whatever came back, the meeting is where the rest of it happens: the
+    // transcript, and — if a piece was refused — the listener offering to
+    // send the rest. Landing on the list instead is how a person ends up
+    // hunting for the meeting they just made.
+    //
+    // Only if they are still on this form. Now that the rail answers during the
+    // sending, walking off to the meetings list mid-upload is an ordinary thing
+    // to do, and a push twenty minutes later would haul them off whatever page
+    // they had chosen instead. The loop itself is left running: it still holds
+    // the decoded samples, and stopping it would cost them the file again.
+    if (live.current) router.push(`/app/m/${result.id}`);
   };
+
+  const sent = marks.filter((m) => m.state === "done").length;
 
   const minutes = plan ? estimateMinutes(plan.pieces.length, SECONDS_PER_PIECE[mode]) : 0;
   const field = {
@@ -204,9 +320,12 @@ export function NewMeetingForm() {
       {/* ── How it will be cut ───────────────────────────────────────────── */}
       <fieldset className="flex flex-col gap-2">
         <legend className="text-sm">{t("modeLabel")}</legend>
+        <p className="text-xs leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+          {t("modeNote")}
+        </p>
         <div className="mt-1 grid gap-3 sm:grid-cols-2">
-          {(["minute", "long"] as const).map((value) => {
-            const blocked = value === "long" && opusReady === false;
+          {(["long", "minute"] as const).map((value) => {
+            const blocked = busy || (value === "long" && opusReady === false);
             const chosen = mode === value;
             return (
               <button
@@ -225,7 +344,7 @@ export function NewMeetingForm() {
                 <span className="mt-1.5 block text-xs leading-relaxed" style={{ color: "var(--ink-soft)" }}>
                   {t(`mode.${value}.body`)}
                 </span>
-                {blocked && (
+                {value === "long" && opusReady === false && (
                   <span className="mt-2 block text-xs leading-relaxed" style={{ color: "var(--warm)" }}>
                     {t("mode.long.unavailable")}
                   </span>
@@ -242,6 +361,7 @@ export function NewMeetingForm() {
         <input
           type="file"
           accept="audio/*"
+          disabled={busy}
           onChange={(e) => void onFile(e.target.files?.[0])}
           className="rounded-lg px-3 py-2.5 text-sm file:me-3 file:rounded-full file:border-0 file:px-4 file:py-1.5 file:text-sm"
           style={field}
@@ -316,15 +436,36 @@ export function NewMeetingForm() {
         </p>
       )}
 
+      {/* ── The sending, from the samples this page already holds ───────── */}
+      {marks.length > 0 && (
+        <div
+          className="p-5"
+          style={{
+            background: "var(--paper-raised)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--radius-panel)",
+          }}
+        >
+          <p className="flex items-center gap-2 text-sm tnum" style={{ color: "var(--ink-soft)" }}>
+            {sending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {t("sending", { done: sent, total: marks.length })}
+          </p>
+          <p className="mt-2 text-xs leading-relaxed" style={{ color: "var(--ink-faint)" }}>
+            {t("sendingNote")}
+          </p>
+          <PieceMarks marks={marks} />
+        </div>
+      )}
+
       <div>
         <button
           type="button"
-          onClick={submit}
-          disabled={!plan || saving}
+          onClick={() => void submit()}
+          disabled={!plan || busy}
           className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50"
           style={{ background: "var(--ink)", color: "var(--paper)" }}
         >
-          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileAudio className="h-4 w-4" />}
+          {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileAudio className="h-4 w-4" />}
           {t("create")}
         </button>
       </div>

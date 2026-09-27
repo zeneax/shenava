@@ -114,6 +114,71 @@ export function splitAllSentences(text: string): string[] {
 }
 
 /**
+ * The boundaries a PERSON edits by, which have to be finer than the ones the
+ * model is numbered on.
+ *
+ * Persian speech does not transcribe as short sentences. It comes back as long
+ * run-on clauses joined with «و» and «،», carrying one full stop at the end of
+ * the whole paragraph. Measured on a real consultation, 23 of 70 turns held no
+ * internal terminator at all — so the sentence list came back with a single
+ * item, the split control never appeared, and the only correction left was
+ * moving the entire paragraph to the other side. That is the bug this exists
+ * to answer.
+ *
+ * So: every boundary `splitAllSentences` finds, plus a full stop that the
+ * transcriber left without a space after it, plus a clause break at a Persian
+ * comma, semicolon or colon — that last only where both halves are long enough
+ * to read. A one-word answer is never cut away from itself.
+ *
+ * The model's numbering deliberately does NOT use this. `splitAllSentences`
+ * stays what spans are counted in, because renumbering the model's view would
+ * change what a stored span means for every meeting already in the database.
+ */
+/**
+ * The shortest piece worth offering as its own button. It is the only guard
+ * needed: a break requires this much text on BOTH sides, so «بله، درست است.»
+ * stays whole while a paragraph of real clauses comes apart.
+ */
+const READABLE_CLAUSE = 20;
+
+/**
+ * A digit in either script. JavaScript's `\d` is ASCII only, so a Persian
+ * decimal — ۱۲.۵ — looked like a full stop between two words and was cut in
+ * half. A test caught it; nothing in the typecheck could have.
+ */
+const DIGIT = "0-9۰-۹٠-٩";
+const RUN_ON_STOP = new RegExp(`(?<=[^${DIGIT}\\s][.!?؟…])(?=[^\\s${DIGIT}])`);
+
+export function splitForEditing(text: string): string[] {
+  const out: string[] = [];
+  for (const sentence of splitAllSentences(text)) {
+    // A full stop the transcriber ran into the next word — «سلام.من هستم».
+    for (const piece of sentence.split(RUN_ON_STOP)) {
+      const trimmed = piece.trim();
+      if (trimmed) out.push(...breakClauses(trimmed));
+    }
+  }
+  return out;
+}
+
+function breakClauses(piece: string): string[] {
+  const parts: string[] = [];
+  let start = 0;
+  for (let i = 0; i < piece.length; i += 1) {
+    if (!"،؛:,;".includes(piece[i] ?? "")) continue;
+    const head = piece.slice(start, i + 1).trim();
+    const tail = piece.slice(i + 1).trim();
+    if (head.length >= READABLE_CLAUSE && tail.length >= READABLE_CLAUSE) {
+      parts.push(head);
+      start = i + 1;
+    }
+  }
+  const last = piece.slice(start).trim();
+  if (last) parts.push(last);
+  return parts.length > 0 ? parts : [piece];
+}
+
+/**
  * The transcript as the sentences the MODEL is numbered on.
  *
  * The same boundaries, with one rule on top: a fragment of a few characters —
@@ -275,10 +340,12 @@ export function withSide(
   if (sentenceIndex === null) {
     replacement.push({ who, text: target.text });
   } else {
-    // splitAllSentences, not splitSentences: the model's numbering folds a
+    // splitForEditing, not splitSentences: the model's numbering folds a
     // one-word answer into its neighbour, and a one-word answer is the very
-    // thing this edit exists to pull back out.
-    const sentences = splitAllSentences(target.text);
+    // thing this edit exists to pull back out. It must be the SAME splitter
+    // the reader pressed in dialogue-view, or index 2 moves a different clause
+    // than the one on screen.
+    const sentences = splitForEditing(target.text);
     if (!sentences[sentenceIndex]) return dialogue;
     const before = sentences.slice(0, sentenceIndex).join(" ");
     const after = sentences.slice(sentenceIndex + 1).join(" ");

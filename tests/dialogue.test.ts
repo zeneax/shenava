@@ -8,6 +8,7 @@ import {
   numberedSentences,
   labelsFromSpans,
   turnsFromLabels,
+  splitForEditing,
   withSide,
   swapSides,
   linesOf,
@@ -111,6 +112,45 @@ test("moving one sentence splits the turn in place and keeps its neighbours' sid
   assert.deepEqual(next.turns.map((t) => t.who), ["consultant", "consultant", "client"]);
   assert.equal(next.turns[1]!.text, "Stock is in a spreadsheet.");
   assert.equal(next.turns[2]!.text, "Orders come by message.");
+});
+
+test("a Persian paragraph of clauses can be edited, not only moved whole", () => {
+  // The shape a real consultation comes back in: one full stop, at the end.
+  // The model's splitter sees one sentence here, which left the reader with no
+  // correction but moving all 150 characters to the other side.
+  const paragraph =
+    "مراجعین مرکز ما معمولاً از طریق واتساپ یا تماس تلفنی با منشی ارتباط می‌گیرن، " +
+    "سؤال‌هایی که مطرح می‌کنن درباره درمانگرشونه، و هزینه‌ای که باید پرداخت کنن.";
+
+  assert.equal(splitAllSentences(paragraph).length, 1);
+  const pieces = splitForEditing(paragraph);
+  assert.ok(pieces.length >= 3, `expected clauses, got ${pieces.length}`);
+  // Nothing is invented and nothing is dropped.
+  assert.equal(pieces.join(" ").replace(/\s+/g, " "), paragraph.replace(/\s+/g, " "));
+});
+
+test("a short turn is never chopped into clauses", () => {
+  // Under the length worth breaking, a comma is just a comma.
+  assert.deepEqual(splitForEditing("بله، درست است."), ["بله، درست است."]);
+  assert.deepEqual(splitForEditing("بله."), ["بله."]);
+});
+
+test("a decimal survives the full stop that lost its space", () => {
+  assert.deepEqual(splitForEditing("قیمت ۱۲.۵ میلیون است."), ["قیمت ۱۲.۵ میلیون است."]);
+  assert.deepEqual(splitForEditing("The budget is 2.5 million."), ["The budget is 2.5 million."]);
+  assert.deepEqual(splitForEditing("سلام.من شهرام هستم."), ["سلام.", "من شهرام هستم."]);
+});
+
+test("the reader's splitter and withSide agree on what index 1 means", () => {
+  // The invariant the whole correction rests on: the button pressed on screen
+  // and the clause moved in the database are the same clause.
+  const paragraph =
+    "ما یک تیم چهار نفره داریم، کارها را خودمان انجام می‌دهیم، و وقت کافی نداریم.";
+  const held = DialogueSchema.parse({ turns: [{ who: "consultant" as Speaker, text: paragraph }] });
+  const shown = splitForEditing(paragraph);
+  const next = withSide(held, 0, 1, "client");
+  const moved = next.turns.find((t) => t.who === "client");
+  assert.equal(moved!.text, shown[1]);
 });
 
 test("adjacent turns of the same side are deliberately not merged", () => {

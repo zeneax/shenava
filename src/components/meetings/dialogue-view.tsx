@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import {
   SPEAKER_LABELS,
   dialogueShare,
-  splitAllSentences,
+  splitForEditing,
   type Dialogue,
   type Lang,
   type Speaker,
 } from "@/lib/meetings/dialogue-schema";
 import { setSide, swapDialogueSides } from "@/lib/actions/dialogue";
-import { ArrowLeftRight, Loader2, Scissors, Users } from "lucide-react";
+import { ArrowLeftRight, ArrowRight, Loader2, Scissors, Users } from "lucide-react";
 
 /**
  * The dialogue, and the three ways to correct it.
@@ -21,8 +21,12 @@ import { ArrowLeftRight, Loader2, Scissors, Users } from "lucide-react";
  * several sentences also opens sentence by sentence, because the pass's usual
  * miss is a one-word answer swallowed by the turn around it — and a one-word
  * answer is exactly the sentence a reader reaches for, which is why the splitter
- * used here is `splitAllSentences` and not the one that numbers sentences for
- * the model (that one glues short fragments onto their neighbour).
+ * used here is `splitForEditing` and not the one that numbers sentences for the
+ * model. That one glues short fragments onto their neighbour, and — worse for
+ * Persian — breaks only at a full stop, which a spoken paragraph of clauses
+ * joined by «و» and «،» does not contain until its very end. `withSide` must
+ * use the same splitter or index 2 moves a different clause than the one
+ * pressed.
  *
  * And either side can be read alone, which is what you do when you are about to
  * write down what the client actually asked for.
@@ -36,15 +40,25 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
   const [openTurn, setOpenTurn] = useState<number | null>(null);
   const [busy, start] = useTransition();
 
+  /* WHICH control is waiting, not merely that one is. `busy` is true for any
+     pending transition, so spinning every button on it put a spinner on the
+     swap button when you had pressed a sentence — the one place the reader
+     looks to find out what they just did. */
+  const [pending, setPending] = useState<string | null>(null);
+  const waiting = (key: string) => busy && pending === key;
+
   const share = dialogueShare(dialogue);
   const total = share.consultant + share.client + share.unknown || 1;
 
-  const move = (turnIndex: number, sentenceIndex: number | null, who: Speaker) =>
+  const move = (turnIndex: number, sentenceIndex: number | null, who: Speaker) => {
+    setPending(`${turnIndex}:${sentenceIndex ?? "turn"}`);
     start(async () => {
       await setSide({ id, turnIndex, sentenceIndex, who });
       setOpenTurn(null);
+      setPending(null);
       router.refresh();
     });
+  };
 
   const colourOf = (who: Speaker) =>
     who === "consultant" ? "var(--cool)" : who === "client" ? "var(--warm)" : "var(--ink-faint)";
@@ -62,17 +76,22 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
         <button
           type="button"
           disabled={busy}
-          onClick={() =>
+          onClick={() => {
+            setPending("swap");
             start(async () => {
               await swapDialogueSides(id);
+              setPending(null);
               router.refresh();
-            })
-          }
-          className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs disabled:opacity-60"
-          style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
+            });
+          }}
+          className="chip"
           title={t("swapWhy")}
         >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+          {waiting("swap") ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <ArrowLeftRight className="h-3.5 w-3.5" />
+          )}
           {t("swap")}
         </button>
       </div>
@@ -108,14 +127,12 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
           <button
             key={value}
             type="button"
+            aria-pressed={only === value}
             onClick={() => setOnly(value)}
-            className="rounded-full px-3.5 py-1 text-xs transition-colors duration-200"
-            style={{
-              background: only === value ? "var(--ink)" : "var(--paper-raised)",
-              color: only === value ? "var(--paper)" : "var(--ink-soft)",
-              border: "1px solid var(--line)",
-            }}
+            className="chip"
+            style={value === "both" ? undefined : ({ "--tint": colourOf(value) } as CSSProperties)}
           >
+            {value !== "both" && <span className="chip-dot" aria-hidden />}
             {value === "both" ? t("both") : SPEAKER_LABELS[value][locale]}
           </button>
         ))}
@@ -124,7 +141,7 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
       <div className="mt-5 flex flex-col">
         {dialogue.turns.map((turn, turnIndex) => {
           if (only !== "both" && turn.who !== only) return null;
-          const sentences = splitAllSentences(turn.text);
+          const sentences = splitForEditing(turn.text);
           const other: Speaker = turn.who === "consultant" ? "client" : "consultant";
           const opened = openTurn === turnIndex;
 
@@ -134,29 +151,43 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
               className="border-t py-4"
               style={{ borderColor: "var(--line)" }}
             >
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-xs" style={{ color: colourOf(turn.who) }}>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+                <span
+                  className="inline-flex items-center gap-1.5 text-xs"
+                  style={{ color: colourOf(turn.who) }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: colourOf(turn.who) }}
+                    aria-hidden
+                  />
                   {SPEAKER_LABELS[turn.who][locale]}
                 </span>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => move(turnIndex, null, other)}
-                  className="rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-60"
-                  style={{ border: "1px solid var(--line)", color: "var(--ink-faint)" }}
+                  className="chip"
+                  style={{ "--tint": colourOf(other) } as CSSProperties}
                   title={t("moveWhole")}
                 >
+                  {waiting(`${turnIndex}:turn`) ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <span className="chip-dot" aria-hidden />
+                  )}
                   {t("moveTo", { side: SPEAKER_LABELS[other][locale] })}
+                  <ArrowRight className="chip-arrow h-3 w-3" aria-hidden />
                 </button>
                 {sentences.length > 1 && (
                   <button
                     type="button"
+                    aria-expanded={opened}
                     onClick={() => setOpenTurn(opened ? null : turnIndex)}
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]"
-                    style={{ border: "1px solid var(--line)", color: "var(--ink-faint)" }}
+                    className="chip"
                     title={t("splitWhy")}
                   >
-                    <Scissors className="h-3 w-3" />
+                    <Scissors className="chip-scissors h-3.5 w-3.5" aria-hidden />
                     {t("split", { n: sentences.length })}
                   </button>
                 )}
@@ -170,10 +201,18 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
                       type="button"
                       disabled={busy}
                       onClick={() => move(turnIndex, sentenceIndex, other)}
-                      className="rounded-lg p-2.5 text-start text-sm leading-relaxed transition-colors duration-200 disabled:opacity-60"
-                      style={{ background: "var(--paper-raised)", border: "1px solid var(--line)" }}
+                      className="sentence text-sm leading-relaxed"
+                      style={{ "--tint": colourOf(other) } as CSSProperties}
                     >
-                      {sentence}
+                      <span className="flex-1">{sentence}</span>
+                      <span className="sentence-go mt-0.5 text-[11px]">
+                        {waiting(`${turnIndex}:${sentenceIndex}`) ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <ArrowRight className="chip-arrow h-3 w-3" aria-hidden />
+                        )}
+                        {SPEAKER_LABELS[other][locale]}
+                      </span>
                     </button>
                   ))}
                   <p className="text-[11px]" style={{ color: "var(--ink-faint)" }}>

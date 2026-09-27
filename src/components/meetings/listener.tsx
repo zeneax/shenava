@@ -5,28 +5,41 @@ import { useTranslations } from "next-intl";
 import { timing } from "@mazarix/voice-kernel";
 import { useRouter } from "@/i18n/navigation";
 import { sha256Hex, planOptionsFor, planSegments, type PieceMode } from "@/lib/meetings/segments";
-import { downsample, toMono, encodeWav } from "@/lib/meetings/wav-encode";
-import { encodeOpusOgg } from "@/lib/meetings/encode";
-import { Upload, Loader2, Check, X, AlertTriangle } from "lucide-react";
+import { downsample, toMono } from "@/lib/meetings/wav-encode";
+import { sendPieces } from "@/lib/meetings/send";
+import { describeError } from "@/lib/describe-error";
+import { PieceMarks, type Mark } from "./piece-marks";
+import { Upload, Loader2, AlertTriangle } from "lucide-react";
 
 /**
- * Sending the pieces, one at a time.
+ * Finishing a meeting that was left half-sent.
  *
  * WHY IT ASKS FOR THE FILE AGAIN. The audio was never stored — not here, not in
  * the database, not anywhere — so resuming a half-finished meeting means the
  * person points at the same recording again. That is the cost of the privacy
  * claim and it is worth stating on the page rather than hiding.
  *
+ * It appears only when something is actually left to send. The first pass does
+ * not come through here: the create form still holds the samples it decoded
+ * and sends them itself, so a meeting made and finished in one sitting asks
+ * for the file exactly once.
+ *
  * The hash is how "the same recording" is checked. Cutting is deterministic, so
  * the same bytes produce the same pieces and piece 7 is the same seven seconds
  * it was yesterday. A different file would silently fill index 7 with somebody
  * else's audio, which is why the hash is compared before a single byte is sent.
  *
- * One request at a time, in index order, awaiting each. Concurrent requests on
- * one API key queue upstream anyway.
+ * The sending itself is `lib/meetings/send`, shared with the create form.
  */
 
-type Row = { idx: number; state: "waiting" | "sending" | "done" | "error"; note?: string };
+/**
+ * The four ways this can end badly. They are kept apart because they send the
+ * reader to four different places: the wrong file, a changed cut, a recording
+ * this browser cannot open, and a browser that gave out partway through the
+ * sending. One message for all four — which is what a single catch produces —
+ * points at the file when the fault was the encoder.
+ */
+type Problem = "mismatch" | "replanned" | "undecodable" | "sendFailed";
 
 export function Listener({
   meetingId,
@@ -44,19 +57,25 @@ export function Listener({
   const t = useTranslations("meeting");
   const router = useRouter();
 
-  const [rows, setRows] = useState<Row[]>(pending.map((idx) => ({ idx, state: "waiting" })));
-  const [problem, setProblem] = useState<string | null>(null);
+  const [marks, setMarks] = useState<Mark[]>(pending.map((idx) => ({ idx, state: "waiting" })));
+  const [problem, setProblem] = useState<Problem | null>(null);
+  /** The machine's own words, under the sentence. Not translated: it is a clue. */
+  const [detail, setDetail] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const stop = useRef(false);
 
-  const mark = (idx: number, state: Row["state"], note?: string) =>
-    setRows((current) => current.map((r) => (r.idx === idx ? { ...r, state, note } : r)));
+  const mark = (idx: number, state: Mark["state"], note?: string) =>
+    setMarks((current) => current.map((m) => (m.idx === idx ? { ...m, state, note } : m)));
 
   const send = async (file: File) => {
     setProblem(null);
+    setDetail(null);
     setRunning(true);
     stop.current = false;
     const context = new AudioContext();
+    // Everything up to here is the file being opened; everything after is the
+    // sending. A throw means something different on each side of that line.
+    let opened = false;
     try {
       const bytes = await file.arrayBuffer();
       const hash = await sha256Hex(bytes);
@@ -68,6 +87,7 @@ export function Listener({
       }
 
       const decoded = await context.decodeAudioData(bytes);
+      opened = true;
       const channels: Float32Array[] = [];
       for (let c = 0; c < decoded.numberOfChannels; c += 1) channels.push(decoded.getChannelData(c));
       const samples = downsample(toMono(channels), decoded.sampleRate, timing.audio.sampleRate);
@@ -79,51 +99,26 @@ export function Listener({
         return;
       }
 
-      for (const idx of pending) {
-        if (stop.current) break;
-        const piece = pieces[idx];
-        if (!piece) continue;
-        mark(idx, "sending");
-
-        const slice = samples.subarray(piece.startSample, piece.endSample);
-        const body =
-          mode === "long"
-            ? await encodeOpusOgg(new Float32Array(slice), timing.audio.sampleRate)
-            : new Uint8Array(encodeWav(slice, timing.audio.sampleRate));
-
-        const response = await fetch(`/api/meetings/${meetingId}/segments/${idx}`, {
-          method: "POST",
-          headers: {
-            "content-type": mode === "long" ? "audio/ogg" : "audio/wav",
-            "x-shenava-format": mode === "long" ? "ogg" : "wav",
-          },
-          body: new Uint8Array(body),
-        });
-
-        const answer = (await response.json().catch(() => ({}))) as {
-          ok?: boolean;
-          note?: string;
-          error?: string;
-        };
-        if (response.ok && answer.ok) mark(idx, "done", answer.note || undefined);
-        else {
-          mark(idx, "error", answer.error ?? `HTTP ${response.status}`);
-          // A ceiling refusal or a revoked key will refuse every remaining
-          // piece the same way, so stop rather than spending the next fifty
-          // requests proving it.
-          if (response.status === 429 || response.status === 403) break;
-        }
-      }
+      await sendPieces({
+        meetingId,
+        mode,
+        samples,
+        pieces,
+        indices: pending,
+        mark,
+        stopped: () => stop.current,
+      });
       router.refresh();
-    } catch {
-      setProblem("undecodable");
+    } catch (error) {
+      setProblem(opened ? "sendFailed" : "undecodable");
+      setDetail(describeError(error));
     } finally {
       setRunning(false);
       void context.close().catch(() => {});
     }
   };
 
-  const done = rows.filter((r) => r.state === "done").length;
+  const done = marks.filter((m) => m.state === "done").length;
 
   return (
     <div
@@ -159,43 +154,25 @@ export function Listener({
       {problem && (
         <p className="mt-3 flex items-start gap-2 text-sm" style={{ color: "var(--color-bad)" }}>
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-          {t(problem === "mismatch" ? "mismatch" : problem === "replanned" ? "replanned" : "undecodable")}
+          <span className="min-w-0">
+            {t(problem)}
+            {detail && (
+              <code className="mt-1 block text-xs break-words" style={{ color: "var(--ink-faint)" }}>
+                {detail}
+              </code>
+            )}
+          </span>
         </p>
       )}
 
       {running && (
         <p className="mt-3 flex items-center gap-2 text-sm tnum" style={{ color: "var(--ink-soft)" }}>
           <Loader2 className="h-4 w-4 animate-spin" />
-          {t("sending", { done, total: rows.length })}
+          {t("sending", { done, total: marks.length })}
         </p>
       )}
 
-      {/* One mark per piece still to send. It is the only honest progress bar
-          available: a piece is done when the server says it is written down. */}
-      {rows.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-1.5">
-          {rows.map((row) => (
-            <span
-              key={row.idx}
-              title={row.note ?? String(row.idx + 1)}
-              className="flex h-6 w-6 items-center justify-center rounded text-[10px] tnum"
-              style={{
-                background:
-                  row.state === "done"
-                    ? "var(--color-good)"
-                    : row.state === "error"
-                      ? "var(--color-bad)"
-                      : row.state === "sending"
-                        ? "var(--warm)"
-                        : "var(--paper-sunken)",
-                color: row.state === "waiting" ? "var(--ink-faint)" : "var(--paper-raised)",
-              }}
-            >
-              {row.state === "done" ? <Check className="h-3 w-3" /> : row.state === "error" ? <X className="h-3 w-3" /> : row.idx + 1}
-            </span>
-          ))}
-        </div>
-      )}
+      <PieceMarks marks={marks} />
     </div>
   );
 }
