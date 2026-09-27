@@ -372,7 +372,8 @@ db/        01_schema.sql, 02_seed.sql — paste into the Supabase SQL Editor
 scripts/   setup.mjs — `npm run setup`, which asks for each key and tests it
            catch-rejections.mjs — opens each page in a headless Chrome and
            reports anything that rejects (see docs/silent-css-and-dead-clicks.md)
-prompts/   PRD.md, PRD.fa.md, BUILD-PROMPT.md — the spec, and the prompt that builds it
+prompts/   the spec, the prompt that builds this from an empty folder, and the
+           rules for changing it — each in English and Persian
 docs/      the journey of a file, and notes on things that were hard to find
            index.html — the Persian README in a face that can read it
 src/       the application
@@ -402,12 +403,22 @@ are most of what that code is for.
 for a coding agent to build this project from an empty folder — the stack, the
 two cutting modes with their real numbers, the three failure modes of live
 transcription providers, the eleven proposal sections, the writer's rules, the
-schema, the screens and the order of work.
+schema, the screens, the setup script and the order of work. Running it produces
+this application, including the `AGENTS.md` that tells the next agent how to
+change it.
 
-Take it, change the stack, change the sections, and build your own. That is
-what it is there for. [`prompts/PRD.md`](prompts/PRD.md) is the specification it
-is written against, and [`prompts/PRD.fa.md`](prompts/PRD.fa.md) is the Persian
-edition.
+Take it, change the stack, change the sections, and build your own. That is what
+it is there for. [`prompts/PRD.md`](prompts/PRD.md) is the specification it is
+written against, and [`prompts/AGENTS.md`](AGENTS.md) is what an agent working
+inside the finished repository reads.
+
+**Every one of them exists in Persian too** — written as Persian, not
+translated: [`BUILD-PROMPT.fa.md`](prompts/BUILD-PROMPT.fa.md),
+[`PRD.fa.md`](prompts/PRD.fa.md) and [`AGENTS.fa.md`](prompts/AGENTS.fa.md).
+The Persian build prompt is self-sufficient: an agent given only that file, in
+an empty folder, arrives at this same application.
+[`prompts/README.md`](prompts/README.md) is the map of the folder, and
+[`prompts/README.fa.md`](prompts/README.fa.md) the Persian one.
 
 ---
 

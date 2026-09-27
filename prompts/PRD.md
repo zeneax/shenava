@@ -5,11 +5,13 @@ a transcript, a dialogue with the two speakers told apart, and a draft of the
 proposal that meeting should produce — in Persian and English at once.
 
 It is one Next.js application, one Postgres database, and one API key. Fork it,
-run it locally, drop in an audio file, and read the proposal it writes.
+run `npm run setup` — which asks for each value and tests it against the real
+service before asking for the next — drop in an audio file, and read the
+proposal it writes.
 
 This document is the specification. If you want the prompt that builds the whole
 thing from an empty folder, that is [`BUILD-PROMPT.md`](BUILD-PROMPT.md) beside
-this file.
+this file, or [`BUILD-PROMPT.fa.md`](BUILD-PROMPT.fa.md) in Persian.
 
 ---
 
@@ -48,7 +50,10 @@ ever a wrong label, never lost text. The page lets you correct a label by
 hand, split a turn sentence by sentence, or swap both sides at once.
 
 **Pass three — the draft.** A model reads the labelled dialogue and writes the
-proposal draft under eleven fixed headings, in both languages at once. It is
+proposal draft under eleven fixed headings, in both languages at once, plus two
+keys that settle what the document is: a `title`, and an `engagement` of
+`project`, `consulting`, `training` or `retainer` — which is what chooses the
+suggested template. It is
 told, at length, never to invent a price, a date or a number: what the meeting
 left unsettled goes under *open questions* instead. It reads the client's lines
 for *what we heard*, *goals*, *budget* and *exclusions*, and the consultant's
@@ -161,6 +166,21 @@ then a genuinely quiet stretch is the likelier explanation.
 half again the room rather than parsing what was never finished. A truncated
 JSON reads as "unreadable", which sends you looking in the wrong place.
 
+### Every seat's ceiling is computed, in one file
+
+That third failure is one mistake made three times — in the transcriber, in the
+speaker pass and in the writer — so all three ceilings are computed in a single
+file with no imports: by the length of the audio, by the sentence count, and by
+the length of the prompt. It has no imports because the modules that call it are
+`server-only`, and `server-only` does not resolve outside Next, which would put
+numbers this consequential beyond the reach of a test.
+
+An answer stopped at its ceiling never says so. It arrives as a truncated
+transcript that reads like bad dictation, or as half a JSON object that reads as
+"this model does not return reliable JSON" — and both send you to the model
+settings, which is the wrong half of the problem. The tell is in the ledger:
+`tokens_out` of exactly the configured ceiling, twice, to the token.
+
 ---
 
 ## 4. Audio is never stored
@@ -212,6 +232,11 @@ about them so it never proposes them itself.
 **`shenava_proposals`** — what an approved draft becomes: a numbered document
 in one language with the template's sections filled in.
 
+Three functions sit beside them: `shenava_spend_status()`, read before every
+model call; `shenava_cost_by_seat(days)`, for reading the ledger back; and
+`shenava_clear_out()`, which drops meetings past `retention_days`, where zero
+means keep forever.
+
 Row Level Security is on for every table with **no policies**, which locks the
 anon key out of everything. All access is server-side through the service role
 key. That is tighter than the usual starting point, not looser.
@@ -242,11 +267,17 @@ a waveform resolving into lines of text, the three passes arriving on scroll.
 Bilingual, Persian right-to-left.
 
 **Meetings** (`/app`) — the list. Title, client, when, status, cost,
-draft status. A row per meeting, newest first.
+draft status. A row per meeting, newest first, and a meeting can be deleted from
+here.
 
 **New meeting** (`/app/new`) — title, client name, language, **mode**, and the
 file. Choosing the file plans the cuts in the browser and shows you what it
-will do: "7 pieces, about 4 minutes" — before anything is sent.
+will do: "7 pieces, about 4 minutes" — before anything is sent. The sending then
+starts on that same page, while the samples are still in its memory, so the file
+is chosen once. If the tab is closed with pieces still pending, reopening the
+meeting asks for the same file again and checks its sha256 before sending a
+byte — which is what "the audio is never stored" costs, and it happens only when
+the samples are genuinely gone.
 
 **One meeting** (`/app/m/[id]`) — the whole working surface, in stages:
 a strip of pieces with their state while it transcribes; the transcript, and an
@@ -274,15 +305,39 @@ sections, headings in both languages, and the house lines.
 ## 8. Settings, connections, and keys
 
 No key is ever in code, in the database, or in the browser. All three come from
-the environment:
+the environment: `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` and
+`OPENROUTER_API_KEY` are required, and `.env.example` lists every variable with
+a comment saying what it is for.
 
-`NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`
-are required. `APP_PASSWORD` is optional: empty means no door at all, which is
-right on `localhost`; set it before you put this on a public domain, because a
-public deployment carries **your** OpenRouter key and anyone who opens the
-record page is spending your money.
+**Configuration is a script, not a file to edit.** `npm run setup` asks for one
+value at a time and tests each answer against the real service before asking the
+next question: it fetches the Supabase project, tries the service key against a
+real table, counts the six tables and stops to have the two SQL files pasted if
+they are missing, and calls OpenRouter and prints the credit left. It writes
+`.env.local` only at the end, after showing every value it is about to write —
+a key as `set · 219 characters`, never the key itself.
 
-`.env.example` lists all of them with comments.
+The reason is that a wrong value in an environment file is not discovered when it
+is written. It is discovered later, as a page that will not load, at which point
+the file looks perfectly reasonable and you are debugging the wrong half of the
+problem. `/app/connections` repeats every one of those checks, because that is
+where a person goes when something stops working a month later.
+
+**There is no login, and `APP_PASSWORD` must stay empty.** On `localhost` the
+only person who can open the page is the person at the keyboard, so a door there
+would be theatre. But be precise about what the variable does: `allowed()` in
+`lib/auth.ts` demands a signed session cookie once it has a value, and nothing in
+this build ever issues one — there is no sign-in page, and `sessionCookie()` is
+exported and never called. So setting it does not add a login; it refuses every
+write and leaves no way in. The setup script therefore writes it empty and does
+not offer to set it.
+
+One case still needs a door: a public deployment carries **your** OpenRouter key,
+and anyone who finds the URL and opens the record page is spending your money.
+That case needs the sign-in page written first — a page that checks the password
+and mints the cookie `sessionCookie()` already knows how to make. The whole
+decision of "who is asking" lives in that one function, which is the only place
+real accounts would change.
 
 ---
 
@@ -317,8 +372,11 @@ The sample meeting renders every stage with no key set at all. Planning a
 Safari session sees mode B disabled with a reason. A piece stopped by the
 filter produces two halved requests and a piece row saying so. The draft never
 contains a figure the transcript does not. Approving pours the draft into the
-template and produces a numbered proposal. Both languages hold the same key
-set, and the Persian pages have no horizontal scroll at 320 pixels wide.
+template and produces a numbered proposal. `npm run typecheck && npm test` is
+green — the suite is about a hundred tests, run by `node --test` straight against
+the TypeScript, with no browser and no network in any of them. Both languages
+hold the same key set, and the Persian pages have no horizontal scroll at 320
+pixels wide.
 
 ---
 

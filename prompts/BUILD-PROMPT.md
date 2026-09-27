@@ -475,6 +475,46 @@ were made differently once and corrected.
 > one of them build a real .docx and read its XML back: that test found a bug
 > the typecheck could not — the draft's own title was not reaching the document.
 >
+> ### Write `AGENTS.md` yourself — the rules that reach the next agent
+>
+> The last act of building this is a file at the root called `AGENTS.md` (and a
+> `CLAUDE.md` that only includes it), which anyone — person or agent — reads
+> before changing this code. What goes in it is not a guess; it is this, because
+> this is what a later reader cannot get out of the code:
+>
+> **Say the documentation exists and is to be read rather than inferred from the
+> code**, and name the files: the README in both languages, the specification in
+> both languages, this instruction, and the walkthrough of one recording that is
+> read before touching the cutting code.
+>
+> **Write down the four non-negotiable rules.** The kernel owns the tuned
+> numbers and no local copy is allowed. `planSegments` stays a pure function of
+> the samples — no clock, no randomness, nothing read off the device — because
+> resumption depends on the same file producing the same cuts, and breaking it
+> shows up as a transcript with a hole in it. The audio is never stored. The
+> draft never invents a figure.
+>
+> **Say that both languages move together:** one key set across both
+> catalogues, Persian written as Persian rather than translated, and the
+> `t("mode")` trap beside a `mode: { … }` block, which throws at render while
+> the page still answers 200.
+>
+> **Write down what the tests constrain, with a code example:** the `.ts`
+> extension on a relative import inside `src/lib`, and that pure logic must not
+> live inside a `server-only` module — naming the files that are kept outside it
+> for exactly that reason.
+>
+> **Say what runs before a commit:** `npm run typecheck && npm test`, then the
+> Persian pages at 320 pixels, with the absolutely-positioned-descendant trap.
+>
+> **And say where notes go:** in `docs/`, and only for something that cost real
+> time **because nothing in the repository could have told you what was wrong** —
+> with the symptom, the actual cause, and the command that would find it again.
+> A bug that was merely hard needs no note.
+>
+> Write the Persian edition of that file too, beside the prompts, and keep the
+> two in step.
+>
 > ### Order of work
 >
 > 1. The project, the environment example, the schema and the seed, the
@@ -498,7 +538,9 @@ were made differently once and corrected.
 >    find it again. The last part is the point. Then a walkthrough of one
 >    recording from chosen to drafted, with every number and the reason for it,
 >    which is the document to read before touching the cutting code.
-> 8. The Persian editions: the README, the walkthrough, and this instruction.
+> 8. `AGENTS.md` and `CLAUDE.md`, with the rules above.
+> 9. The Persian editions: the README, the walkthrough, this instruction, and
+>    `AGENTS.md`.
 >    Each written as Persian, not translated. GitHub renders a README in a font
 >    stack with no Persian glyphs and its sanitiser strips `style`, so if the
 >    Persian edition matters, give it a page of its own in a readable face and
