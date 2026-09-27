@@ -5,16 +5,21 @@ import { Waveform } from "@/components/waveform";
 import { ArrowRight, GitFork, Scissors, Users, FileText, ShieldCheck, Coins, FlaskConical } from "lucide-react";
 
 /**
- * Where the Fork button goes: GitHub's own "create a fork" page, not the
- * repository's front page. The label promises the act, so the link performs it
- * — one press and GitHub is asking where to put the copy.
+ * Where the Fork button goes: the repository's own page.
+ *
+ * It pointed at GitHub's `/fork` page for a while, which performs the act in a
+ * single press — but only for somebody who does not already own the
+ * repository. GitHub will not fork a repository to the account that holds it,
+ * so the person who published this gets an empty page, and an empty page is
+ * worse than one more click. The repository's front page carries a Fork button
+ * of its own and it works for everybody who lands there.
  *
  * It stays pointed at the original even when this file is read from a fork.
  * Somebody on a copy of this page who presses Fork still means "give me my own
  * copy of the project", and a link that pointed at itself would hand them a
  * copy of a copy, one commit further from where the work happens.
  */
-const FORK_URL = "https://github.com/zeneax/shenava/fork";
+const FORK_URL = "https://github.com/zeneax/shenava";
 
 export default async function Landing({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
