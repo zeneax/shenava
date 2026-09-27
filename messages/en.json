@@ -1,7 +1,7 @@
 {
   "brand": {
     "name": "Shenava",
-    "tagline": "A meeting becomes a proposal."
+    "description": "A recorded consultation becomes a transcript, a dialogue with the two speakers told apart, and a draft of the proposal that meeting should produce — in Persian and English at once."
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -10,15 +10,13 @@
     "settings": "Settings",
     "connections": "Connections",
     "templates": "Templates",
-    "fork": "Fork it on GitHub",
-    "home": "Home"
+    "fork": "Fork it on GitHub"
   },
   "landing": {
     "eyebrow": "Open source · MIT",
     "title": "A recorded consultation becomes the proposal it should produce.",
     "lede": "Drop in an hour of audio. Shenava writes down the words, tells the two speakers apart, and drafts the proposal under eleven headings — in Persian and English at once. Then it stops and waits for you.",
     "openDashboard": "Open the dashboard",
-    "readSpec": "Read the specification",
     "passesTitle": "Three passes, each useless without the one before it",
     "pass1": {
       "n": "One",
@@ -163,8 +161,7 @@
     "undecodable": "Your browser could not decode that file.",
     "sendFailed": "The sending stopped partway. Nothing was lost — the pieces that arrived are written down, and choosing the file again carries on from there.",
     "transcript": "The transcript",
-    "characters": "{n} characters",
-    "nextPasses": "Next: pouring an approved draft into a proposal template, and the Word and print-sheet exports. The Settings and Templates screens are specified in prompts/PRD.md, section 7."
+    "characters": "{n} characters"
   },
   "dialogue": {
     "heading": "Who said it",

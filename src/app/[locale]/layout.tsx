@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { NextIntlClientProvider, hasLocale } from "next-intl";
-import { setRequestLocale } from "next-intl/server";
+import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Vazirmatn } from "next/font/google";
 
 import { routing, direction, type Locale } from "@/i18n/routing";
@@ -20,11 +20,27 @@ const vazir = Vazirmatn({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "Shenava · شنوا",
-  description:
-    "A recorded consultation becomes a transcript, a labelled dialogue, and a proposal draft — in Persian and English at once.",
-};
+/**
+ * The description was one English sentence for both editions, so the Persian
+ * page described itself in English — to a search engine, and in the preview
+ * card of every link anybody ever pasted. It is the one piece of text on the
+ * page that nobody looking at the page can see, which is why it sat wrong for
+ * so long. It comes from the messages now, like everything else.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const brand = await getTranslations({ locale, namespace: "brand" });
+  return {
+    // Both scripts, in both editions: it is the same application read by two
+    // readers, and the title bar is where that is most obvious.
+    title: "Shenava · شنوا",
+    description: brand("description"),
+  };
+}
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
