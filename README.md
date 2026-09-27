@@ -6,6 +6,8 @@ in Persian and English at once.**
 
 Fork it, run it locally, drop in an audio file, read the proposal it writes.
 
+**[نسخهٔ فارسی ←](README.fa.md)**
+
 > **Status: complete, and taken end to end on a real recording** — chosen,
 > cut, transcribed, told apart by speaker, and drafted. The unit suite and the
 > typecheck are green. If something breaks on your own audio, [open an
