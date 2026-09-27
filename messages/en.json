@@ -119,13 +119,14 @@
       "english": "English"
     },
     "modeLabel": "How to cut it",
+    "modeNote": "Long pieces is the default.",
     "mode": {
       "minute": {
-        "title": "Minute pieces",
+        "title": "Minute pieces (for short consultations)",
         "body": "60 seconds each, uncompressed. About 60 requests for an hour of audio, and 12 to 15 minutes of waiting. Right for a short recording."
       },
       "long": {
-        "title": "Long pieces",
+        "title": "Long pieces (faster, and for long consultations)",
         "body": "9 minutes each, compressed in your browser to Opus. Six or seven requests for an hour of audio, and four or five minutes of waiting. Right for a real meeting.",
         "unavailable": "This browser has no Opus encoder, so it cannot compress the pieces. Safari is the usual case — Chrome or Firefox can."
       }
@@ -139,7 +140,9 @@
     "planLine": "{duration} minutes of audio becomes {pieces} pieces, sent one after another — about {minutes} minutes of waiting.",
     "planBytes": "The file is {mb} MB. It stays on this machine; only the pieces are sent, and only as they are needed.",
     "refused": "Not created:",
-    "create": "Create the meeting"
+    "create": "Create it and start sending",
+    "sending": "Sent {done} of {total} pieces. One at a time; leave this tab open.",
+    "sendingNote": "The recording is still in this page's memory, so you do not have to choose it again."
   },
   "meeting": {
     "untitled": "Untitled meeting",
@@ -158,6 +161,7 @@
     "mismatch": "That is a different recording. The fingerprint does not match the one this meeting was planned from, and sending it would fill the waiting pieces with the wrong seconds. Choose the original file, or delete this meeting and start again.",
     "replanned": "That file cuts into a different number of pieces than this meeting was planned with. It is probably a re-export rather than the original. Delete this meeting and create it again from the file you have.",
     "undecodable": "Your browser could not decode that file.",
+    "sendFailed": "The sending stopped partway. Nothing was lost — the pieces that arrived are written down, and choosing the file again carries on from there.",
     "transcript": "The transcript",
     "characters": "{n} characters",
     "nextPasses": "Next: pouring an approved draft into a proposal template, and the Word and print-sheet exports. The Settings and Templates screens are specified in prompts/PRD.md, section 7."
@@ -175,7 +179,7 @@
     "swapWhy": "For a pass that had the two people the wrong way round from the start. Moves the whole meeting.",
     "moveTo": "Move to {side}",
     "moveWhole": "Moves this turn and nothing else. No model is called.",
-    "split": "{n} sentences",
+    "split": "Open the {n} sentences",
     "splitWhy": "The usual miss is a one-word answer swallowed by the turn around it. Open the turn and move just that sentence.",
     "splitHint": "Press a sentence to move it to {side}. What comes before and after keeps this turn's side.",
     "reason": {

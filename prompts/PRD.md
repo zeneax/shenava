@@ -72,10 +72,12 @@ recording must be cut, and **how** you cut it is the entire performance
 characteristic of this product.
 
 Shenava offers two modes, chosen on the form when the meeting is created.
+Mode B is the one offered first and chosen by default; a browser with no Opus
+encoder falls back to mode A, since the default must never be the disabled one.
 Neither is stored as a setting: `inferMode()` reads the mode back off the
 lengths of the pieces, so a resumed upload plans exactly the same cuts.
 
-### Mode A — minute pieces (default; short recordings)
+### Mode A — minute pieces (short recordings)
 
 Pieces of at most **60 seconds**, sent as uncompressed **WAV**.
 
@@ -100,7 +102,7 @@ another, roughly twelve seconds each — so twelve to fifteen minutes of waiting
 **Use it when:** the recording is short (under ten minutes), or the browser has
 no Opus encoder, or a piece in mode B failed and you want the smaller unit.
 
-### Mode B — long pieces (fast; long recordings)
+### Mode B — long pieces (default; fast; long recordings)
 
 Pieces of up to **nine minutes**, compressed **in the browser** to Opus at
 **24 kbit/s** and wrapped in an Ogg container written by hand.

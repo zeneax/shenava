@@ -22,7 +22,6 @@
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { randomBytes } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -171,10 +170,12 @@ async function main() {
   say(c.bold("  Shenava · setup"));
   say(c.dim("  A recorded consultation becomes a proposal draft."));
   say();
-  say("  This asks for three things and tests each one as you give it:");
+  say("  This asks for two things and tests each one as you give it:");
   say(`    ${c.cyan("1.")} where your Supabase project is, and its service key`);
   say(`    ${c.cyan("2.")} an OpenRouter key, which pays for every model call`);
-  say(`    ${c.cyan("3.")} whether this will be on a public address, and so needs a door`);
+  say();
+  say(c.dim("  It also checks the six tables exist, and tells you which two files to"));
+  say(c.dim("  run in the SQL Editor if they do not."));
   say();
   say(c.dim("  Nothing is written until the end, and no key is ever printed back."));
 
@@ -337,33 +338,26 @@ async function main() {
   values.OPENROUTER_APP_URL = existing.OPENROUTER_APP_URL || "http://localhost:3100";
 
   /* ── 4. The door ──────────────────────────────────────────────────────── */
-  step(4, "The door — and why there usually is not one");
+  step(4, "The door — and why this build has none");
   say();
   say("  On your own machine the only person who can open the page is you, so");
-  say("  Shenava asks for no password by default. A login there would be like");
-  say("  locking a folder on your own desktop.");
+  say("  Shenava asks for no password. A login there would be like locking a");
+  say("  folder on your own desktop.");
   say();
-  say(`  ${c.bold("One case needs a door.")} If you put this on a public address — to show`);
-  say("  a client, say — that deployment carries YOUR OpenRouter key, and anyone");
-  say("  who finds the URL and opens the record page is spending your money.");
+  say(`  ${c.bold("Setting one here would lock you out of your own app.")} A non-empty`);
+  say("  APP_PASSWORD makes allowed() in lib/auth.ts demand a signed session");
+  say("  cookie — and nothing in this application issues one. There is no");
+  say("  sign-in page, and sessionCookie() is exported and never called. Every");
+  say("  write answers \"denied\" with no way in. So this script does not ask,");
+  say("  and writes the door open.");
   say();
-
-  const wantsDoor = await yes("Will this be reachable from the internet?", false);
-  if (wantsDoor) {
-    say();
-    values.APP_PASSWORD = await askUntil("A password for the dashboard", {
-      current: existing.APP_PASSWORD,
-      secret: true,
-      check: async (answer) =>
-        answer.length >= 10 ? true : "Ten characters or more, please — this is the only thing in front of your key.",
-    });
-    values.APP_SESSION_SECRET = existing.APP_SESSION_SECRET || randomBytes(32).toString("hex");
-    ok("Password set, and a signing secret generated.");
-  } else {
-    values.APP_PASSWORD = "";
-    values.APP_SESSION_SECRET = existing.APP_SESSION_SECRET || "";
-    ok("No door. Run this again if you ever deploy it.");
-  }
+  say(`  ${c.bold("Before any public deployment:")} that deployment carries YOUR OpenRouter`);
+  say("  key, and anyone who finds the URL is spending your money. The sign-in");
+  say("  has to be written first — APP_PASSWORD alone is half a door.");
+  say();
+  values.APP_PASSWORD = "";
+  values.APP_SESSION_SECRET = "";
+  ok("No door, and none to set.");
 
   /* ── 5. Write it ──────────────────────────────────────────────────────── */
   step(5, "Writing .env.local");
