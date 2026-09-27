@@ -4,6 +4,18 @@ import { localeLabel, routing, type Locale } from "@/i18n/routing";
 import { Waveform } from "@/components/waveform";
 import { ArrowRight, GitFork, Scissors, Users, FileText, ShieldCheck, Coins, FlaskConical } from "lucide-react";
 
+/**
+ * Where the Fork button goes: GitHub's own "create a fork" page, not the
+ * repository's front page. The label promises the act, so the link performs it
+ * — one press and GitHub is asking where to put the copy.
+ *
+ * It stays pointed at the original even when this file is read from a fork.
+ * Somebody on a copy of this page who presses Fork still means "give me my own
+ * copy of the project", and a link that pointed at itself would hand them a
+ * copy of a copy, one commit further from where the work happens.
+ */
+const FORK_URL = "https://github.com/zeneax/shenava/fork";
+
 export default async function Landing({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale);
@@ -71,7 +83,12 @@ export default async function Landing({ params }: { params: Promise<{ locale: st
             <ArrowRight className="h-4 w-4 flip" />
           </Link>
           <a
-            href="https://github.com"
+            href={FORK_URL}
+            // A new tab: this leaves for somebody else's site, and the reader
+            // who was halfway through the page should still have it when they
+            // come back.
+            target="_blank"
+            rel="noreferrer"
             className="inline-flex items-center gap-2 rounded-full px-6 py-3 text-sm transition-colors duration-200"
             style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
           >
