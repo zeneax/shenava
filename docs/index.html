@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>شنوا · راهنمای فارسی</title>
+<meta name="description" content="ضبط یک جلسهٔ مشاوره تبدیل می‌شود به متن، به گفت‌وگویی که دو طرفش از هم جدا شده‌اند، و به پیش‌نویس پیشنهاد.">
+
+<!--
+  WHY THIS PAGE EXISTS.
+
+  GitHub renders a README with its own font stack — `-apple-system, "Segoe UI",
+  "Noto Sans", Helvetica, Arial` — and not one of those families carries Persian
+  glyphs. The browser falls back on whatever the system has, which on macOS is
+  Geeza Pro, and Geeza Pro at body size is genuinely hard to read. Nothing in
+  the Markdown can change it: GitHub's sanitiser strips `style` attributes,
+  turns a `<style>` block into visible text, and drops `<font>` — tested, not
+  assumed. Only `dir` and `align` survive.
+
+  So the Persian edition gets a page of its own, in Vazirmatn, which is the same
+  face the application itself sets. It holds no copy of the text: it fetches
+  `README.fa.md` from the repository at load. One document, two places to read
+  it, and nothing to keep in step.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700&display=swap" rel="stylesheet">
+
+<style>
+  /* The application's own palette, so the page reads as part of the product. */
+  :root {
+    color-scheme: light;
+    --paper: #e2ded7;
+    --paper-raised: #edeae4;
+    --paper-sunken: #d6d1c8;
+    --ink: #21252a;
+    --ink-soft: #4e565f;
+    --ink-faint: #7b848e;
+    --line: #c5bfb4;
+    --warm: #b46a22;
+    --cool: #2f6f6b;
+    --radius: 0.875rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #23262a;
+      --paper-raised: #2c3035;
+      --paper-sunken: #1b1e21;
+      --ink: #ddd8d0;
+      --ink-soft: #a8a49c;
+      --ink-faint: #7d7a73;
+      --line: #3b4045;
+      --warm: #d9a163;
+      --cool: #7ab8b2;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { -webkit-text-size-adjust: 100%; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Vazirmatn, ui-sans-serif, system-ui, sans-serif;
+    /* Persian letterforms carry more ink than Latin ones and need the room:
+       a line height that looks generous in English looks tight here. */
+    font-size: 1.0625rem;
+    line-height: 2.05;
+    font-weight: 400;
+  }
+
+  .bar {
+    border-block-end: 1px solid var(--line);
+    background: var(--paper-raised);
+  }
+  .bar-inner {
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 0.9rem 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+  .bar a { color: var(--ink-soft); }
+  .bar .name { color: var(--cool); font-size: 1.05rem; font-weight: 500; }
+  .bar nav { display: flex; gap: 1rem; }
+
+  main {
+    max-width: 48rem;
+    margin: 0 auto;
+    /* A 16px gutter at phone width, and nothing that can scroll sideways. */
+    padding: 2.5rem 1rem 6rem;
+  }
+
+  a { color: var(--cool); text-decoration-thickness: 1px; text-underline-offset: 0.2em; }
+  a:hover { text-decoration-thickness: 2px; }
+
+  h1, h2, h3, h4 { line-height: 1.5; font-weight: 700; }
+  h1 { font-size: 2rem; margin: 0 0 1.5rem; }
+  h2 {
+    font-size: 1.45rem;
+    margin: 3rem 0 1rem;
+    padding-block-end: 0.5rem;
+    border-block-end: 1px solid var(--line);
+  }
+  h3 { font-size: 1.15rem; margin: 2.25rem 0 0.75rem; }
+  h4 { font-size: 1rem; margin: 1.75rem 0 0.5rem; color: var(--ink-soft); }
+
+  p, ul, ol { margin: 0 0 1.15rem; }
+  li { margin-block-end: 0.5rem; }
+  ul, ol { padding-inline-start: 1.5rem; }
+
+  strong { font-weight: 700; }
+
+  hr { border: 0; border-block-start: 1px solid var(--line); margin: 3rem 0; }
+
+  blockquote {
+    margin: 1.5rem 0;
+    padding: 0.25rem 1.1rem;
+    border-inline-start: 3px solid var(--warm);
+    color: var(--ink-soft);
+  }
+  blockquote > :last-child { margin-block-end: 0; }
+
+  /* Code is always left to right, whatever the page around it is doing. */
+  code, pre, kbd {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+  code {
+    background: var(--paper-sunken);
+    padding: 0.15em 0.4em;
+    border-radius: 0.3rem;
+    font-size: 0.88em;
+    /* An inline token longer than the column — `https://abcdefghijklm.supabase.co`
+       is the one that did it — otherwise widens the whole document rather than
+       its own line, and on a phone the page then scrolls sideways. In a
+       right-to-left edition that pushes the text off the side the reader
+       starts from. */
+    overflow-wrap: anywhere;
+  }
+  pre {
+    direction: ltr;
+    text-align: left;
+    background: var(--paper-sunken);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 1rem 1.1rem;
+    /* The scroller is `relative` so an absolutely positioned descendant is
+       clipped by it rather than widening the document. */
+    position: relative;
+    overflow-x: auto;
+    line-height: 1.7;
+    font-size: 0.88rem;
+  }
+  /* Inside a `pre` the opposite is wanted: the block scrolls, so a command
+     must stay on the one line it was written on. */
+  pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    font-size: 0.95rem;
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: 0.55rem 0.8rem;
+    text-align: start;
+  }
+  th { background: var(--paper-raised); font-weight: 500; }
+
+  img { max-width: 100%; }
+
+  .state {
+    color: var(--ink-faint);
+    text-align: center;
+    padding: 3rem 0;
+  }
+  .state a { color: var(--cool); }
+
+  footer {
+    max-width: 48rem;
+    margin: 0 auto;
+    padding: 0 1rem 4rem;
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+    border-block-start: 1px solid var(--line);
+    padding-block-start: 1.5rem;
+  }
+</style>
+</head>
+
+<body>
+  <header class="bar">
+    <div class="bar-inner">
+      <span class="name">شنوا · Shenava</span>
+      <nav>
+        <a id="repo-link" href="https://github.com/zeneax/shenava">مخزن در GitHub</a>
+        <a id="en-link" href="https://github.com/zeneax/shenava#readme">English</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div id="doc">
+      <p class="state" id="state">در حال خواندن راهنما…</p>
+    </div>
+    <noscript>
+      <p class="state">
+        این صفحه راهنما را از مخزن می‌خواند و برای همین به JavaScript نیاز دارد.
+        <a href="https://github.com/zeneax/shenava/blob/main/README.fa.md">متن را مستقیم در GitHub بخوانید</a>.
+      </p>
+    </noscript>
+  </main>
+
+  <footer>
+    این صفحه نسخهٔ دیگری از راهنما نیست — همان <code>README.fa.md</code> مخزن را
+    می‌خواند و فقط با فونت درست نشانش می‌دهد. پروانه: MIT.
+  </footer>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script>
+  /**
+   * Which repository to read from.
+   *
+   * Derived from the address rather than written down, so a fork published to
+   * its own Pages site shows its own README without anybody editing this file.
+   * The fallback is the original, for the case where this page is opened from
+   * a file rather than from a Pages host.
+   */
+  function source() {
+    const host = location.hostname.match(/^([^.]+)\.github\.io$/);
+    const first = location.pathname.split("/").filter(Boolean)[0];
+    if (host && first) return { owner: host[1], repo: first };
+    return { owner: "zeneax", repo: "shenava" };
+  }
+
+  const { owner, repo } = source();
+  const repoUrl = `https://github.com/${owner}/${repo}`;
+  document.getElementById("repo-link").href = repoUrl;
+  document.getElementById("en-link").href = `${repoUrl}#readme`;
+
+  const raw = `https://raw.githubusercontent.com/${owner}/${repo}/main/README.fa.md`;
+
+  fetch(raw)
+    .then((response) => {
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return response.text();
+    })
+    .then((markdown) => {
+      // The document already carries its own `dir` wrappers for GitHub, and
+      // this page is right-to-left from the root, so they simply agree.
+      document.getElementById("doc").innerHTML = marked.parse(markdown);
+      // The title is the page's own; the one in the document would repeat it.
+      const first = document.querySelector("#doc h1");
+      if (first) first.remove();
+    })
+    .catch((error) => {
+      const state = document.getElementById("state");
+      if (!state) return;
+      state.innerHTML =
+        `راهنما خوانده نشد (${String(error.message || error)}). ` +
+        `<a href="${repoUrl}/blob/main/README.fa.md">متن را در GitHub بخوانید</a>.`;
+    });
+</script>
+</body>
+</html>

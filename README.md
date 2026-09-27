@@ -6,7 +6,7 @@ in Persian and English at once.**
 
 Fork it, run it locally, drop in an audio file, read the proposal it writes.
 
-**[نسخهٔ فارسی ←](README.fa.md)**
+**[نسخهٔ فارسی ←](README.fa.md)** · [read it in a Persian face](https://zeneax.github.io/shenava/)
 
 > **Status: complete, and taken end to end on a real recording** — chosen,
 > cut, transcribed, told apart by speaker, and drafted. The unit suite and the
@@ -372,6 +372,7 @@ scripts/   setup.mjs — `npm run setup`, which asks for each key and tests it
            reports anything that rejects (see docs/silent-css-and-dead-clicks.md)
 prompts/   PRD.md, PRD.fa.md, BUILD-PROMPT.md — the spec, and the prompt that builds it
 docs/      the journey of a file, and notes on things that were hard to find
+           index.html — the Persian README in a face that can read it
 src/       the application
 tests/     `npm test` — 106 of them, no browser and no network needed
 ```
