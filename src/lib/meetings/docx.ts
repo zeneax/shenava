@@ -1,12 +1,12 @@
 import {
-  AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun,
+  AlignmentType, CharacterSet, Document, HeadingLevel, Packer, Paragraph, TextRun,
 } from "docx";
 import {
   ENGAGEMENT_LABELS, FIXED_LABELS, EMPTY_SECTION, isEmptySection, sectionLabel,
   type MeetingNotes, type NotesLang, type SectionDef, type SectionValue,
 } from "./notes-schema.ts";
 import { SPEAKER_LABELS, type Dialogue } from "./dialogue-schema.ts";
-import { durationLabel, meetingDate } from "./format.ts";
+import { durationLabel, meetingDate, metaJoin } from "./format.ts";
 
 /* Deliberately NOT `server-only`: `docx` builds the file in pure JavaScript and needs no server at all, and `server-only` does not resolve
    outside Next — marking it would put this beyond the reach of a test that
@@ -20,12 +20,25 @@ import { durationLabel, meetingDate } from "./format.ts";
  * needs a Chromium the function does not have, and is why the PDF is the
  * browser's own print of the sheet in `./print` rather than a file from here.
  *
- * Persian paragraphs are marked bidirectional and aligned right, and every
- * run is marked right-to-left, so Word lays the text out as Persian rather
- * than as left-to-right text that happens to contain Persian letters. The
- * font is named, not embedded — Word substitutes when it lacks it, and a
- * document that names Vazirmatn opens correctly where it is installed and
- * readably everywhere else.
+ * Persian paragraphs are marked bidirectional and aligned to their START,
+ * and every run is marked right-to-left, so Word lays the text out as Persian
+ * rather than as left-to-right text that happens to contain Persian letters.
+ *
+ * START, and not RIGHT. In a `w:bidi` paragraph Word reads `w:jc` left/right
+ * as logical, not physical: `right` is the END of a right-to-left line, which
+ * is its left edge. Every Persian paragraph here was `right`, and Word set
+ * all of them flush left. Quick Look reads the same value physically and
+ * showed them flush right, which is why this survived a look. Measured in
+ * Word 16.112 with one paragraph per value: right → left edge, left → right
+ * edge, start → right edge, end → left edge, none → right edge.
+ *
+ * The font is EMBEDDED when the caller passes it, and only named otherwise.
+ * Named alone, Word substitutes on a machine without Vazirmatn — the Persian
+ * came out in a Times-like Arabic face, legible and not what the studio sends
+ * a client. Embedding is 120 KB, which is what a page of Persian in its own
+ * face costs. It is an argument rather than a file read here because this
+ * module is pure on purpose (see the note above): the route reads the file,
+ * the test reads the same file, and this module never touches a disk.
  *
  * The studio's name is an ARGUMENT, not a constant. It is printed on the
  * document and set as its author, and a forkable project cannot ship somebody
@@ -54,6 +67,9 @@ export type MeetingForDocument = {
 
 export type DocumentPart = "transcript" | "dialogue" | "notes";
 
+/** The TrueType bytes of the document face, for embedding. Regular is enough: Word thickens it for bold. */
+export type DocumentFonts = { regular: Buffer };
+
 export function partTitle(part: DocumentPart, lang: NotesLang): string {
   if (part === "transcript") return lang === "fa" ? "رونوشت جلسه" : "Meeting transcript";
   if (part === "dialogue") return lang === "fa" ? "گفت‌وگوی جلسه، به تفکیک گوینده" : "Meeting dialogue, by speaker";
@@ -64,8 +80,19 @@ const FONT = "Vazirmatn";
 
 type Heading = (typeof HeadingLevel)[keyof typeof HeadingLevel];
 
+/**
+ * `w:lang` names the language of the complex-script text, and without it Word
+ * proofs Persian as whatever the document's default is — every word wrongly
+ * spelt, red from the first line to the last. `value` is for any Latin run
+ * inside the same text (Postgres, WhatsApp), `bidirectional` for the Persian.
+ */
+const LANGUAGE = {
+  fa: { value: "en-US", bidirectional: "fa-IR" },
+  en: { value: "en-US" },
+} as const;
+
 function run(text: string, lang: NotesLang, extra: { bold?: boolean; size?: number } = {}) {
-  return new TextRun({ text, rightToLeft: lang === "fa", font: FONT, ...extra });
+  return new TextRun({ text, rightToLeft: lang === "fa", font: FONT, language: LANGUAGE[lang], ...extra });
 }
 
 function para(
@@ -75,7 +102,7 @@ function para(
 ) {
   return new Paragraph({
     bidirectional: lang === "fa",
-    alignment: lang === "fa" ? AlignmentType.RIGHT : AlignmentType.LEFT,
+    alignment: lang === "fa" ? AlignmentType.START : AlignmentType.LEFT,
     heading: options.heading,
     bullet: options.bullet ? { level: 0 } : undefined,
     spacing: { after: options.heading ? 120 : 80 },
@@ -113,14 +140,14 @@ function header(
   studio: Studio,
 ): Paragraph[] {
   const what = partTitle(kind, lang);
-  const meta = [
+  const meta = metaJoin([
     meeting.client_name
       ? (lang === "fa" ? `کلاینت: ${meeting.client_name}` : `Client: ${meeting.client_name}`)
       : "",
     meetingDate(meeting.created_at, lang),
     meeting.duration_ms > 0 ? durationLabel(meeting.duration_ms, lang) : "",
     studioName(studio, lang),
-  ].filter(Boolean).join(" · ");
+  ], lang);
   return [
     para(documentHeading(meeting, lang, kind) || what, lang, { heading: HeadingLevel.TITLE }),
     para(what, lang, { muted: true }),
@@ -140,15 +167,15 @@ function transcriptBody(text: string, lang: NotesLang): Paragraph[] {
 /** Who said what: the side in bold, then the turn. Names, when the pass found them, in the heading. */
 function dialogueBody(dialogue: Dialogue, lang: NotesLang): Paragraph[] {
   const out: Paragraph[] = [];
-  const named = [
+  const named = metaJoin([
     dialogue.consultant.name ? `${SPEAKER_LABELS.consultant[lang]}: ${dialogue.consultant.name}` : "",
     dialogue.client.name ? `${SPEAKER_LABELS.client[lang]}: ${dialogue.client.name}` : "",
-  ].filter(Boolean).join(" · ");
+  ], lang);
   if (named) out.push(para(named, lang, { muted: true }));
   for (const turn of dialogue.turns) {
     out.push(new Paragraph({
       bidirectional: lang === "fa",
-      alignment: lang === "fa" ? AlignmentType.RIGHT : AlignmentType.LEFT,
+      alignment: lang === "fa" ? AlignmentType.START : AlignmentType.LEFT,
       spacing: { after: 100 },
       children: [
         run(`${SPEAKER_LABELS[turn.who][lang]}: `, lang, { bold: true }),
@@ -206,8 +233,9 @@ export async function buildMeetingDocx(input: {
   part: DocumentPart;
   lang: NotesLang;
   studio: Studio;
+  fonts?: DocumentFonts;
 }): Promise<Buffer> {
-  const { meeting, part, lang, studio } = input;
+  const { meeting, part, lang, studio, fonts } = input;
   const body =
     part === "transcript" ? transcriptBody(meeting.transcript ?? "", lang)
     : part === "dialogue" ? (meeting.dialogue ? dialogueBody(meeting.dialogue, lang) : [])
@@ -217,8 +245,9 @@ export async function buildMeetingDocx(input: {
     creator: studioName(studio, lang) || "Shenava",
     title: meeting.title || partTitle(part, "en"),
     styles: {
-      default: { document: { run: { font: FONT, size: 22 } } },
+      default: { document: { run: { font: FONT, size: 22, language: LANGUAGE[lang] } } },
     },
+    fonts: fonts ? [{ name: FONT, data: fonts.regular, characterSet: CharacterSet.ARABIC }] : undefined,
     sections: [{
       properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } },
       children: [...header(meeting, lang, part, studio), ...body],

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { allowed } from "@/lib/auth";
 import { loadForDocument } from "@/lib/meetings/documents";
 import { buildMeetingDocx, type DocumentPart } from "@/lib/meetings/docx";
+import { documentFonts } from "@/lib/meetings/fonts";
 import { documentFileName } from "@/lib/meetings/format";
 import { LANGS, type Lang } from "@/lib/meetings/langs";
 
@@ -34,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     (part === "notes" && !held.meeting.notes);
   if (missing) return NextResponse.json({ error: `no ${part} yet` }, { status: 409 });
 
-  const file = await buildMeetingDocx({ meeting: held.meeting, part, lang, studio: held.studio });
+  const file = await buildMeetingDocx({ meeting: held.meeting, part, lang, studio: held.studio, fonts: documentFonts() });
   const name = documentFileName(held.meeting.title, part, lang, "docx");
 
   return new NextResponse(new Uint8Array(file), {

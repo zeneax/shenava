@@ -165,3 +165,62 @@ test("each part is named in both editions", () => {
     assert.ok(partTitle(part, "en").length > 0);
   }
 });
+
+/* ── Persian, as Word lays it out ──────────────────────────────────────── */
+
+test("every Persian run names its language, so Word proofs it as Persian and not as misspelt English", async () => {
+  const xml = documentXml(await buildMeetingDocx({ meeting, part: "dialogue", lang: "fa", studio }));
+  assert.match(xml, /<w:lang [^>]*w:bidi="fa-IR"/, "no complex-script language on the runs");
+  const en = documentXml(await buildMeetingDocx({ meeting, part: "dialogue", lang: "en", studio }));
+  assert.doesNotMatch(en, /w:bidi="fa-IR"/, "the English edition is tagged Persian");
+});
+
+test("the Persian metadata line is joined with a Persian comma, never a middle dot", async () => {
+  // A middle dot beside a Persian digit is read as a zero: «· ۸ مهر» is «۸۰ مهر».
+  const fa = documentXml(await buildMeetingDocx({ meeting, part: "notes", lang: "fa", studio }));
+  assert.ok(!fa.includes(" · "), "a middle dot survived in the Persian document");
+  assert.ok(fa.includes("، "), "the Persian comma is missing");
+  const en = documentXml(await buildMeetingDocx({ meeting, part: "notes", lang: "en", studio }));
+  assert.ok(en.includes(" · "), "the English document lost its separator");
+});
+
+test("the print sheet joins its Persian metadata the same way", () => {
+  const fa = renderMeetingPrint({ meeting, part: "dialogue", lang: "fa", autoPrint: false, studio });
+  assert.ok(!fa.includes(" · "), "a middle dot survived on the Persian sheet");
+  assert.ok(fa.includes("، "), "the Persian comma is missing from the sheet");
+  const en = renderMeetingPrint({ meeting, part: "dialogue", lang: "en", autoPrint: false, studio });
+  assert.ok(en.includes(" · "), "the English sheet lost its separator");
+});
+
+
+/* ── The face travels with the file ─────────────────────────────────────── */
+
+import { documentFonts } from "../src/lib/meetings/fonts.ts";
+
+test("the Persian face is embedded, so the document looks the same on a machine without it", async () => {
+  const file = await buildMeetingDocx({ meeting, part: "dialogue", lang: "fa", studio, fonts: documentFonts() });
+  const entries = unzipSync(new Uint8Array(file));
+  const embedded = Object.keys(entries).filter((k) => /^word\/fonts\/.+\.odttf$/.test(k));
+  assert.equal(embedded.length, 1, "exactly one embedded font part");
+  const table = strFromU8(entries["word/fontTable.xml"]!);
+  assert.match(table, /w:name="Vazirmatn"/, "the font table does not name the face");
+  assert.match(table, /w:embedRegular/, "the face is named but not embedded");
+  // The face is 120 KB before the zip squeezes it; the same document without
+  // it is a few kilobytes, so the difference is the face and nothing else.
+  const plain = await buildMeetingDocx({ meeting, part: "dialogue", lang: "fa", studio });
+  assert.ok(file.byteLength > plain.byteLength + 50_000, `no room for a face: ${file.byteLength} vs ${plain.byteLength}`);
+});
+
+test("without the font handed over, the document only names the face", async () => {
+  const file = await buildMeetingDocx({ meeting, part: "dialogue", lang: "fa", studio });
+  const entries = unzipSync(new Uint8Array(file));
+  assert.ok(!Object.keys(entries).some((k) => k.startsWith("word/fonts/")), "a font part appeared unasked");
+});
+
+test("Persian paragraphs align to START, because Word reads right as the left edge of a bidi line", async () => {
+  const fa = documentXml(await buildMeetingDocx({ meeting, part: "dialogue", lang: "fa", studio }));
+  assert.ok(!/<w:jc w:val="right"\/>/.test(fa), "a Persian paragraph is jc=right, which Word sets flush left");
+  assert.match(fa, /<w:jc w:val="start"\/>/, "Persian paragraphs carry no start alignment");
+  const en = documentXml(await buildMeetingDocx({ meeting, part: "dialogue", lang: "en", studio }));
+  assert.match(en, /<w:jc w:val="left"\/>/, "the English document lost its alignment");
+});

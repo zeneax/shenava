@@ -45,3 +45,17 @@ export function documentFileName(
     : (lang === "fa" ? "پیش‌نویس" : "draft");
   return `${base} — ${suffix}.${ext}`;
 }
+
+/**
+ * The separator between the pieces of a metadata line — client, date,
+ * duration, studio.
+ *
+ * It was a middle dot in both languages, and in Persian a middle dot is the
+ * digit zero: «۰» is a small circle, and so is «·». «رها · ۸ مهر ۱۴۰۵ · ۱۱۰
+ * دقیقه» was read, in Word and in Quick Look alike, as «رها ۸۰ مهر ۱۴۰۵ ۱۱۰
+ * دقیقه ۰» — the wrong day, an extra number, a stray zero. The Persian comma
+ * is what Persian uses for a list, and it is not a digit.
+ */
+export function metaJoin(parts: readonly string[], lang: NotesLang): string {
+  return parts.filter(Boolean).join(lang === "fa" ? "، " : " · ");
+}

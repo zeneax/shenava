@@ -3,7 +3,7 @@ import {
   type MeetingNotes, type NotesLang, type SectionDef, type SectionValue,
 } from "./notes-schema.ts";
 import { SPEAKER_LABELS, type Dialogue } from "./dialogue-schema.ts";
-import { durationLabel, meetingDate } from "./format.ts";
+import { durationLabel, meetingDate, metaJoin } from "./format.ts";
 import { documentHeading, partTitle, studioName, type DocumentPart, type MeetingForDocument, type Studio } from "./docx.ts";
 
 /* Deliberately NOT `server-only`: this only builds a string, and `server-only` does not resolve
@@ -39,10 +39,10 @@ function paragraphs(text: string): string {
 }
 
 function dialogueBody(dialogue: Dialogue, lang: NotesLang): string {
-  const named = [
+  const named = metaJoin([
     dialogue.consultant.name ? `${SPEAKER_LABELS.consultant[lang]}: ${dialogue.consultant.name}` : "",
     dialogue.client.name ? `${SPEAKER_LABELS.client[lang]}: ${dialogue.client.name}` : "",
-  ].filter(Boolean).join(" · ");
+  ], lang);
   return [
     named ? `<p class="muted">${esc(named)}</p>` : "",
     ...dialogue.turns.map((t) =>
@@ -94,13 +94,13 @@ export function renderMeetingPrint(input: {
   const { meeting, part, lang, autoPrint, studio } = input;
   const what = partTitle(part, lang);
   const heading = documentHeading(meeting, lang, part) || what;
-  const meta = [
+  const meta = metaJoin([
     meeting.client_name
       ? (lang === "fa" ? `کلاینت: ${meeting.client_name}` : `Client: ${meeting.client_name}`)
       : "",
     meetingDate(meeting.created_at, lang),
     meeting.duration_ms > 0 ? durationLabel(meeting.duration_ms, lang) : "",
-  ].filter(Boolean).map(esc).join(" · ");
+  ].map(esc), lang);
 
   const body =
     part === "transcript" ? paragraphs(meeting.transcript ?? "")
