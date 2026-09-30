@@ -4,8 +4,8 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { allowed } from "@/lib/auth";
-import { MeetingNotesSchema } from "@/lib/meetings/notes-schema";
-import { TemplateSchema, nextNumber, pour } from "@/lib/meetings/template";
+import { parseNotes } from "@/lib/meetings/notes-schema";
+import { TemplateSchema, templateSections, nextNumber, pour } from "@/lib/meetings/template";
 
 /**
  * An approved draft poured into a template, as a numbered proposal.
@@ -46,8 +46,10 @@ export async function pourIntoTemplate(input: unknown): Promise<PourResult> {
     .maybeSingle();
   if (!meeting) return { ok: false, reason: "no such meeting" };
 
-  const notes = meeting.notes ? MeetingNotesSchema.safeParse(meeting.notes) : null;
-  if (!notes?.success) return { ok: false, reason: "no draft" };
+  // Held until the template is read: the draft is read against the sections of
+  // the template it is being poured into, so a clause that template names and
+  // the draft does not pours empty rather than being silently absent.
+  let notes: ReturnType<typeof parseNotes> | null = null;
   // The draft has to have been read by a person first. This is the one gate
   // between a model's sentences and a document with a number on it.
   if (meeting.draft_status !== "approved") return { ok: false, reason: "not approved" };
@@ -59,6 +61,9 @@ export async function pourIntoTemplate(input: unknown): Promise<PourResult> {
     .maybeSingle();
   const template = templateRow ? TemplateSchema.safeParse(templateRow) : null;
   if (!template?.success) return { ok: false, reason: "no such template" };
+
+  notes = meeting.notes ? parseNotes(meeting.notes, templateSections(template.data)) : null;
+  if (!notes?.success) return { ok: false, reason: "no draft" };
 
   const poured = pour(notes.data, template.data, lang);
 

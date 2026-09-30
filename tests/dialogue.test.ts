@@ -228,82 +228,145 @@ test("a long line is cut on a word boundary and marked as cut", () => {
    and their JSON reader, and a reader of one wants the other in view. */
 
 test("a section rewritten in one language leaves the other one alone", async () => {
-  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
-  const notes = MeetingNotesSchema.parse({
-    fa: { title: "عنوان", goals: ["هدف فارسی"] },
-    en: { title: "Title", goals: ["English goal"] },
-  });
+  const { parseNotes, withSection, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = parseNotes({
+    fa: { title: "عنوان", sections: { goals: ["هدف فارسی"] } },
+    en: { title: "Title", sections: { goals: ["English goal"] } },
+  }, DEFAULT_SECTIONS).data!;
 
-  // THE BUG THIS EXISTS FOR: every section's schema carries a default, so
-  // parsing `undefined` succeeds and yields the empty default. Passing one
-  // edition and leaving the other as `undefined` would erase it, silently.
-  const next = withSection(notes, "goals", { fa: ["هدف تازه"] });
-  assert.deepEqual(next.fa.goals, ["هدف تازه"]);
-  assert.deepEqual(next.en.goals, ["English goal"], "the English edition was erased");
+  // THE BUG THIS EXISTS FOR: every reader here carries a default, so reading
+  // `undefined` succeeds and yields the empty value. Passing one edition and
+  // leaving the other as `undefined` would erase it, silently.
+  const next = withSection(notes, "goals", "lines", { fa: ["هدف تازه"] });
+  assert.deepEqual(next.fa.sections.goals!.lines, ["هدف تازه"]);
+  assert.deepEqual(next.en.sections.goals!.lines, ["English goal"], "the English edition was erased");
 });
 
 test("passing both editions replaces both", async () => {
-  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
-  const notes = MeetingNotesSchema.parse({ fa: { goals: ["a"] }, en: { goals: ["b"] } });
-  const next = withSection(notes, "goals", { fa: ["x"], en: ["y"] });
-  assert.deepEqual([next.fa.goals, next.en.goals], [["x"], ["y"]]);
+  const { parseNotes, withSection, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = parseNotes({ fa: { sections: { goals: ["a"] } }, en: { sections: { goals: ["b"] } } }, DEFAULT_SECTIONS).data!;
+  const next = withSection(notes, "goals", "lines", { fa: ["x"], en: ["y"] });
+  assert.deepEqual([next.fa.sections.goals!.lines, next.en.sections.goals!.lines], [["x"], ["y"]]);
 });
 
 test("phases and their schedule note move together, because the proposal prints them as one", async () => {
-  const { MeetingNotesSchema, withSection, sectionValue } = await import("../src/lib/meetings/notes-schema.ts");
-  const notes = MeetingNotesSchema.parse({
-    fa: { phases: [{ title: "یک", detail: "..." }], scheduleNote: "سه هفته" },
-    en: { phases: [{ title: "One", detail: "..." }], scheduleNote: "three weeks" },
-  });
-  const next = withSection(notes, "phases", {
+  const { parseNotes, withSection, sectionValue, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const notes = parseNotes({
+    fa: { sections: { phases: { phases: [{ title: "یک", detail: "..." }], scheduleNote: "سه هفته" } } },
+    en: { sections: { phases: { phases: [{ title: "One", detail: "..." }], scheduleNote: "three weeks" } } },
+  }, DEFAULT_SECTIONS).data!;
+  const next = withSection(notes, "phases", "phases", {
     fa: { phases: [{ title: "دو", when: "", detail: "…" }], scheduleNote: "چهار هفته" },
   });
-  assert.equal(next.fa.phases[0]!.title, "دو");
-  assert.equal(next.fa.scheduleNote, "چهار هفته");
-  assert.equal(next.en.scheduleNote, "three weeks");
-  assert.deepEqual(sectionValue(next, "phases", "en"), {
-    phases: notes.en.phases,
+  assert.equal(next.fa.sections.phases!.phases[0]!.title, "دو");
+  assert.equal(next.fa.sections.phases!.scheduleNote, "چهار هفته");
+  assert.equal(next.en.sections.phases!.scheduleNote, "three weeks");
+  assert.deepEqual(sectionValue(next, "phases", "phases", "en"), {
+    phases: notes.en.sections.phases!.phases,
     scheduleNote: "three weeks",
   });
 });
 
-test("open questions are stored once for both editions, not inside an edition", async () => {
-  const { MeetingNotesSchema, withSection } = await import("../src/lib/meetings/notes-schema.ts");
-  const notes = MeetingNotesSchema.parse({ fa: {}, en: {}, openQuestions: { fa: ["الف"], en: ["a"] } });
-  const next = withSection(notes, "openQuestions", { en: ["b", "c"] });
-  assert.deepEqual(next.openQuestions.fa, ["الف"]);
-  assert.deepEqual(next.openQuestions.en, ["b", "c"]);
+test("a draft written before the section list moved to the template still opens", async () => {
+  // Real meetings hold the old shape: twelve named keys on each edition and an
+  // `openQuestions` pair at the top level. They are lifted on the way IN rather
+  // than migrated in SQL, so a row restored from a backup next year lifts too.
+  const { parseNotes, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const legacy = {
+    facts: ["CLIENT: thirty a month"],
+    fa: {
+      title: "عنوان", engagement: "project",
+      summary: "خلاصه", understanding: ["الف"], goals: ["ب"],
+      phases: [{ title: "یک", when: "هفتهٔ اول", detail: "..." }], scheduleNote: "سه هفته",
+      method: [], deliverables: ["پ"], budget: [], exclusions: ["ت"],
+      assumptions: [], whyUs: ["ث"], nextSteps: ["ج"],
+    },
+    en: {
+      title: "Title", engagement: "project",
+      summary: "Summary", understanding: ["a"], goals: ["b"],
+      phases: [{ title: "One", when: "Week 1", detail: "..." }], scheduleNote: "three weeks",
+      method: [], deliverables: ["c"], budget: [], exclusions: ["d"],
+      assumptions: [], whyUs: ["e"], nextSteps: ["f"],
+    },
+    openQuestions: { fa: ["پرسش؟"], en: ["Question?"] },
+  };
+  const parsed = parseNotes(legacy, DEFAULT_SECTIONS);
+  assert.ok(parsed.success, "a real stored draft stopped opening");
+  const notes = parsed.data!;
+  assert.equal(notes.fa.title, "عنوان");
+  assert.equal(notes.fa.engagement, "project");
+  assert.equal(notes.fa.sections.summary!.text, "خلاصه");
+  assert.deepEqual(notes.en.sections.goals!.lines, ["b"]);
+  assert.equal(notes.fa.sections.phases!.scheduleNote, "سه هفته");
+  assert.equal(notes.fa.sections.phases!.phases[0]!.when, "هفتهٔ اول");
+  // Open questions were stored outside the editions and are now an ordinary
+  // section inside each one.
+  assert.deepEqual(notes.fa.sections.openQuestions!.lines, ["پرسش؟"]);
+  assert.deepEqual(notes.en.sections.openQuestions!.lines, ["Question?"]);
+  assert.deepEqual(notes.facts, ["CLIENT: thirty a month"]);
+});
+
+test("a section the template does not name is dropped rather than printed", async () => {
+  // Both directions of the same rule: a model that invents a thirteenth section
+  // should not have it printed, and a template that dropped a section should
+  // not keep showing it from a draft written before the drop.
+  const { parseNotes } = await import("../src/lib/meetings/notes-schema.ts");
+  const sections = [
+    { key: "goals", label_fa: "اهداف", label_en: "Goals", kind: "lines" as const, optional: false, brief: "" },
+  ];
+  const notes = parseNotes({
+    fa: { sections: { goals: ["ok"], invented: ["no"] } },
+    en: { sections: { goals: ["ok"], invented: ["no"] } },
+  }, sections).data!;
+  assert.deepEqual(Object.keys(notes.fa.sections), ["goals"]);
 });
 
 test("a draft missing whole sections parses, because a meeting may never reach them", async () => {
-  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
-  const parsed = MeetingNotesSchema.safeParse({ fa: {}, en: {} });
+  const { parseNotes, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = parseNotes({ fa: {}, en: {} }, DEFAULT_SECTIONS);
   assert.equal(parsed.success, true);
-  assert.deepEqual(parsed.data!.fa.exclusions, []);
+  assert.deepEqual(parsed.data!.fa.sections, {});
   assert.equal(parsed.data!.fa.engagement, "unknown");
 });
 
 test("an engagement the model invented falls back to unknown rather than failing the draft", async () => {
-  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
-  const parsed = MeetingNotesSchema.parse({ fa: { engagement: "partnership" }, en: {} });
+  const { parseNotes, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = parseNotes({ fa: { engagement: "partnership" }, en: {} }, DEFAULT_SECTIONS).data!;
   assert.equal(parsed.fa.engagement, "unknown");
 });
 
 test("an over-long line is clamped, not rejected — a model cannot count characters", async () => {
-  const { MeetingNotesSchema } = await import("../src/lib/meetings/notes-schema.ts");
-  const parsed = MeetingNotesSchema.parse({ fa: { goals: ["x".repeat(900)] }, en: {} });
-  assert.ok(parsed.fa.goals[0]!.length <= 400);
-  assert.ok(parsed.fa.goals[0]!.endsWith("…"));
+  const { parseNotes, DEFAULT_SECTIONS } = await import("../src/lib/meetings/notes-schema.ts");
+  const parsed = parseNotes({ fa: { sections: { goals: ["x".repeat(900)] } }, en: {} }, DEFAULT_SECTIONS).data!;
+  assert.ok(parsed.fa.sections.goals!.lines[0]!.length <= 400);
+  assert.ok(parsed.fa.sections.goals!.lines[0]!.endsWith("…"));
 });
 
-test("every rewritable section has a heading in both languages", async () => {
-  const { REWRITABLE_SECTIONS, SECTION_LABELS } = await import("../src/lib/meetings/notes-schema.ts");
-  for (const section of REWRITABLE_SECTIONS) {
-    if (section === "title") continue;
-    const label = SECTION_LABELS[section];
-    assert.ok(label, `${section} has no heading`);
-    assert.ok(label.fa.length > 0 && label.en.length > 0, `${section} is missing an edition`);
+test("every section the built-in template ships has a heading in both languages and a brief", async () => {
+  const { DEFAULT_SECTIONS, sectionLabel } = await import("../src/lib/meetings/notes-schema.ts");
+  for (const section of DEFAULT_SECTIONS) {
+    assert.ok(sectionLabel(section, "fa").length > 0, `${section.key} has no Persian heading`);
+    assert.ok(sectionLabel(section, "en").length > 0, `${section.key} has no English heading`);
+    // A section with no brief is a section the writer is asked for with no
+    // instruction, and it fills it from whatever the heading suggests.
+    assert.ok(section.brief.length > 0, `${section.key} tells the writer nothing`);
   }
+});
+
+test("the guide composed from a template is the guide, and no template can reach the rules", async () => {
+  const { sectionGuide, WRITER_RULES } = await import("../src/lib/meetings/proposal-guide.ts");
+  const mine = sectionGuide([
+    { key: "risks", label_fa: "ریسک‌ها", label_en: "Risks", kind: "lines", optional: false, brief: "what could go wrong, as the meeting named it." },
+  ]);
+  assert.match(mine, /- risks: what could go wrong/);
+  // The two keys no template owns are in every guide, whatever the sections are.
+  assert.match(mine, /- title:/);
+  assert.match(mine, /- engagement:/);
+  // And the prohibition is not in the composed guide at all — it is a constant
+  // the prompt adds separately, so a studio editing its own template can never
+  // edit its way into permission to invent a price.
+  assert.doesNotMatch(mine, /NEVER invent/);
+  assert.match(WRITER_RULES, /NEVER invent a price/);
 });
 
 test("the writer is told never to invent a figure, in those words", async () => {

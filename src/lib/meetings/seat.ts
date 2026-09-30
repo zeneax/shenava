@@ -43,6 +43,8 @@ export type Material = {
   language: string;
   transcript: string;
   dialogue: unknown;
+  /** The template this meeting is written against; null means the default one. */
+  templateId: string | null;
 };
 
 export type Seat = { settings: Settings; system: string };
@@ -54,7 +56,7 @@ export async function loadMaterial(
   if (!supabase) return { ok: false, reason: "no_database" };
   const { data } = await supabase
     .from("shenava_meetings")
-    .select("id,title,client_name,language,transcript,dialogue")
+    .select("id,title,client_name,language,transcript,dialogue,template_id")
     .eq("id", meetingId)
     .maybeSingle();
   if (!data) return { ok: false, reason: "no_meeting" };
@@ -70,6 +72,7 @@ export async function loadMaterial(
       language: data.language,
       transcript: data.transcript,
       dialogue: data.dialogue,
+      templateId: (data.template_id as string | null) ?? null,
     },
   };
 }

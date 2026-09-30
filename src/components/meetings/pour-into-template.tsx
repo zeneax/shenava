@@ -6,6 +6,7 @@ import { useRouter } from "@/i18n/navigation";
 import { templateName, type Template } from "@/lib/meetings/template";
 import type { Lang } from "@/lib/meetings/langs";
 import { pourIntoTemplate } from "@/lib/actions/proposals";
+import { chooseTemplate } from "@/lib/actions/templates";
 import { LayoutTemplate, Loader2, Check, FileDown, Printer } from "lucide-react";
 
 /**
@@ -34,6 +35,17 @@ export function PourIntoTemplate({
   const router = useRouter();
 
   const [templateId, setTemplateId] = useState(suggested ?? templates[0]?.id ?? "");
+
+  /**
+   * Choosing a template RECORDS the choice, because the template decides what
+   * the writer is asked for — not just what is printed. Redrawing afterwards
+   * writes that template's sections, which is the loop a studio expects when it
+   * adds a clause: edit the template, pick it here, redraw.
+   */
+  const choose = (next: string) => {
+    setTemplateId(next);
+    void chooseTemplate({ id, templateId: next }).then(() => router.refresh());
+  };
   const [lang, setLang] = useState<Lang>(locale);
   const [problem, setProblem] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(poured?.number ?? null);
@@ -76,7 +88,7 @@ export function PourIntoTemplate({
               <button
                 key={template.id}
                 type="button"
-                onClick={() => setTemplateId(template.id)}
+                onClick={() => choose(template.id)}
                 className="rounded-full px-4 py-1.5 text-xs transition-colors duration-200"
                 style={{
                   background: templateId === template.id ? "var(--cool)" : "var(--paper-sunken)",

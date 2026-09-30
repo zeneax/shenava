@@ -16,7 +16,7 @@ version one. Read this to understand the product.
 coding agent to build this project from an empty folder. Paste either one into
 Claude Code, or any agent that can write files and run commands, and it has
 everything it needs to decide: the stack, every tuned number, the algorithms,
-the eleven proposal sections, the writer's rules, the schema, the screens, the
+the template-owned proposal sections, the writer's rules, the schema, the screens, the
 setup script, the order of work, what to put in `AGENTS.md` at the end, and what
 proves it is finished.
 
@@ -55,7 +55,7 @@ The **writer** prompt is the long one, and the rule it exists to enforce is:
 never invent a price, a date or a number. Its section list lives in
 `src/lib/meetings/proposal-guide.ts`, in a file with no imports so that a test
 can assert the wording — softening that rule has to be a deliberate act with a
-failing test in front of it. `BUILD-PROMPT.md` has all eleven headings and what
+failing test in front of it. `BUILD-PROMPT.md` has all twelve default headings and what
 each is for.
 
 The **studio's own voice** is not in any prompt. It comes from

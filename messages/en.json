@@ -15,7 +15,7 @@
   "landing": {
     "eyebrow": "Open source · MIT",
     "title": "A recorded consultation becomes the proposal it should produce.",
-    "lede": "Drop in an hour of audio. Shenava writes down the words, tells the two speakers apart, and drafts the proposal under eleven headings — in Persian and English at once. Then it stops and waits for you.",
+    "lede": "Drop in an hour of audio. Shenava writes down the words, tells the two speakers apart, and drafts the proposal under the template's headings — in Persian and English at once. Then it stops and waits for you.",
     "openDashboard": "Open the dashboard",
     "passesTitle": "Three passes, each useless without the one before it",
     "pass1": {
@@ -192,7 +192,7 @@
     "heading": "The proposal draft",
     "draw": "Draft the proposal",
     "drawing": "Reading the meeting and writing…",
-    "drawNote": "One call, both languages at once, under eleven headings. The model writes down the facts first — who said what, every number and date — and then writes both editions from that list and from nothing else. It is told never to invent a price, a date or a number: what the meeting left open becomes a question instead.",
+    "drawNote": "One call, both languages at once, under the template's headings. The model writes down the facts first — who said what, every number and date — and then writes both editions from that list and from nothing else. It is told never to invent a price, a date or a number: what the meeting left open becomes a question instead.",
     "drawWithoutDialogue": "The speakers have not been told apart yet, so the draft will be written from the raw transcript. It still works, but four of the sections read the client's own lines and the consultant's separately — running the speaker pass first makes a noticeably better draft.",
     "waits": "The draft waits for you. Edit a section by typing, have one written again with an instruction, or redraw the whole thing. Every change sets it back to waiting, so nothing you have not read can be approved.",
     "titleSection": "Title and engagement",
@@ -217,7 +217,16 @@
     "redrawHint": "An instruction for the whole draft, or leave it empty",
     "approve": "Approve this draft",
     "reject": "Reject it",
-    "backToReview": "Back to waiting"
+    "proposed": "This is what it would write. Nothing is saved until you accept it.",
+    "nowReads": "Now",
+    "wouldRead": "Proposed",
+    "accept": "Accept",
+    "discard": "Discard",
+    "again": "Again",
+    "againHint": "What should it change?",
+    "undecide": "Back to waiting",
+    "wontPrint": "Empty, so it will not print",
+    "phaseLine": "One phase a line: title | when | detail. Then a blank line and the schedule note."
   },
   "pour": {
     "heading": "Into a proposal",
@@ -261,9 +270,28 @@
     "houseLinesNote": "Your terms, your validity period, your bank details — whatever a proposal of yours always carries. They matter more than they look: the writer is TOLD about these lines so it never proposes them itself, which is why they belong here and not in the draft.",
     "oneLine": "One line per line. Blank lines are dropped.",
     "sections": "What it prints · {n} sections",
-    "sectionsNote": "These are the draft's own section keys, which is what makes pouring a copy rather than a mapping. They are not editable here on purpose — a template naming a key the draft does not have prints nothing for it, which is right for a template that outlived a schema change and wrong to hand somebody a free-text box for. A dot marks a section that is dropped when the meeting left it empty.",
+    "sectionsNote": "This list is both what gets printed and **what the model is asked for**. A section you add here is written the next time you redraw a draft. The order is the document's order.",
     "save": "Save this template",
-    "saved": "Saved."
+    "saved": "Saved.",
+    "noSections": "This template names no sections, so it falls back to the built-in twelve. Add one to shape your own document.",
+    "newSection": "New section",
+    "addSection": "Add a section",
+    "removeSection": "Remove this section",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "headingFa": "Persian heading",
+    "headingEn": "English heading",
+    "brief": "What to tell the writer",
+    "briefHint": "For example: the risks the meeting named, one per line. If the meeting named none, leave it empty.",
+    "briefNote": "This sentence is what the model reads for this section. The more exactly you say what you want and what you do not, the better the section. The rule against inventing a figure is fixed and cannot be changed from here.",
+    "kindLabel": "Holds",
+    "kind": {
+      "text": "Prose",
+      "lines": "A list of lines",
+      "phases": "Phases"
+    },
+    "optional": "Drop it when the meeting left it empty",
+    "thenRedraw": "Saved. To have the new sections written, open that meeting and press “Draw the whole draft again” — or ask for one section on its own."
   },
   "settings": {
     "heading": "Settings",

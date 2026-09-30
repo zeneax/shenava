@@ -4,7 +4,7 @@ import { unzipSync, strFromU8 } from "fflate";
 
 import { buildMeetingDocx, partTitle, studioName } from "../src/lib/meetings/docx.ts";
 import { renderMeetingPrint } from "../src/lib/meetings/print.ts";
-import { MeetingNotesSchema } from "../src/lib/meetings/notes-schema.ts";
+import { parseNotes, DEFAULT_SECTIONS } from "../src/lib/meetings/notes-schema.ts";
 import { DialogueSchema } from "../src/lib/meetings/dialogue-schema.ts";
 
 const studio = { name: "Nilgoon Works", nameFa: "کارگاه نیلگون" };
@@ -23,7 +23,8 @@ const meeting = {
       { who: "client", text: "موجودی در یک صفحه‌گسترده است." },
     ],
   }),
-  notes: MeetingNotesSchema.parse({
+  sections: DEFAULT_SECTIONS,
+  notes: parseNotes({
     fa: {
       title: "جدول موجودی و ربات پاسخ",
       engagement: "project",
@@ -45,7 +46,7 @@ const meeting = {
       exclusions: ["Payment is not in this proposal."],
     },
     openQuestions: { fa: ["عدد چقدر است؟"], en: ["What figure?"] },
-  }),
+  }, DEFAULT_SECTIONS).data!,
 };
 
 /** A .docx is a zip; this reads the one part that holds the words. */

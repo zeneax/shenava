@@ -8,9 +8,9 @@ import { RunSpeakers } from "@/components/meetings/run-speakers";
 import { DialogueSchema } from "@/lib/meetings/dialogue-schema";
 import { DraftView } from "@/components/meetings/draft-view";
 import { RunDraft } from "@/components/meetings/run-draft";
-import { MeetingNotesSchema } from "@/lib/meetings/notes-schema";
+import { parseNotes } from "@/lib/meetings/notes-schema";
 import { PourIntoTemplate } from "@/components/meetings/pour-into-template";
-import { readTemplates, readProposalNumber } from "@/lib/meetings/templates-read";
+import { readTemplates, readProposalNumber, readSectionsFor } from "@/lib/meetings/templates-read";
 import { suggestTemplate } from "@/lib/meetings/template";
 import { FileText, Clock, Coins, Scissors } from "lucide-react";
 
@@ -39,7 +39,10 @@ export default async function OneMeeting({
     ? parsedDialogue.data
     : null;
 
-  const parsedNotes = meeting.notes ? MeetingNotesSchema.safeParse(meeting.notes) : null;
+  // The sections come from the meeting's template: they decide what the draft
+  // holds, what this page shows, and what the documents print.
+  const sections = await readSectionsFor(meeting.templateId);
+  const parsedNotes = meeting.notes ? parseNotes(meeting.notes, sections) : null;
   const notes = parsedNotes?.success ? parsedNotes.data : null;
 
   // The templates are only read when there is a draft to pour into one.
@@ -153,7 +156,7 @@ export default async function OneMeeting({
       {meeting.status === "transcribed" && !notes && (
         <RunDraft id={meeting.id} hasDialogue={dialogue !== null} />
       )}
-      {notes && <DraftView id={meeting.id} notes={notes} status={meeting.draftStatus} />}
+      {notes && <DraftView id={meeting.id} notes={notes} sections={sections} status={meeting.draftStatus} />}
 
       {/* ── The template, and the documents ───────────────────────────── */}
       {notes && (

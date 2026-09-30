@@ -4,17 +4,30 @@ import { useState, useTransition } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import {
-  ENGAGEMENT_LABELS, LIST_SECTIONS, SECTION_LABELS, sectionValue,
-  type MeetingNotes, type NotesLang, type RewritableSection,
+  EMPTY_SECTION, ENGAGEMENT_LABELS, FIXED_LABELS, isEmptySection, sectionLabel,
+  writeSectionValue,
+  type MeetingNotes, type NotesLang, type Phase, type SectionDef, type SectionKind,
 } from "@/lib/meetings/notes-schema";
-import { saveSection, decideDraft } from "@/lib/actions/notes";
-import { Check, Loader2, Pencil, RefreshCw, ThumbsDown, Undo2, X, FileSignature } from "lucide-react";
+import { saveSection, acceptSection, decideDraft } from "@/lib/actions/notes";
+import { Check, Loader2, Pencil, RefreshCw, Sparkles, ThumbsDown, Undo2, X, FileSignature } from "lucide-react";
 
 /**
- * The draft, and the four things a reviewer does to it.
+ * The draft, and the five things a reviewer does to it.
  *
- * Edit a section by typing. Have one section written again, with an instruction.
- * Redraw the whole thing with an instruction. Decide.
+ * Edit a section by typing. Ask for one to be written again, with an
+ * instruction. COMPARE what came back against what is there and accept or
+ * discard it. Redraw the whole thing. Decide.
+ *
+ * THE COMPARISON IS THE POINT OF THIS SCREEN. A rewrite used to save itself,
+ * which made asking for one a gamble: the lines you had were gone before you
+ * could read the new ones, and a rewrite that came back worse cost you the
+ * version you were happy with. Now nothing is written until you say so, the two
+ * are shown side by side, and the instruction box stays open underneath so a
+ * proposal you do not like can be asked for again without losing your place.
+ *
+ * The section list is a PROP, not a constant: it comes from the meeting's
+ * template, so a clause a studio added last week appears here with everything
+ * the built-in ones have.
  *
  * It opens on the reader's own language but shows either, because the two
  * editions are not translations of each other and a reviewer checks both before
@@ -24,15 +37,21 @@ import { Check, Loader2, Pencil, RefreshCw, ThumbsDown, Undo2, X, FileSignature 
  * a two-minute await inside `useTransition` entangles every navigation on the
  * page and the dashboard stops answering its own links.
  */
-type Busy = { what: "draw" | "section" | "save" | "decide"; which?: string } | null;
+
+type Busy = { what: "draw" | "section"; which?: string } | null;
+type Proposal = { key: string; before: Record<NotesLang, unknown>; after: Record<NotesLang, unknown> };
+
+const TITLE_KEY = "title";
 
 export function DraftView({
   id,
   notes,
+  sections,
   status,
 }: {
   id: string;
   notes: MeetingNotes;
+  sections: SectionDef[];
   status: "pending" | "approved" | "rejected";
 }) {
   const t = useTranslations("draft");
@@ -42,29 +61,66 @@ export function DraftView({
   const [lang, setLang] = useState<NotesLang>(locale);
   const [busy, setBusy] = useState<Busy>(null);
   const [problem, setProblem] = useState<string | null>(null);
-  const [editing, setEditing] = useState<RewritableSection | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [drafted, setDrafted] = useState("");
   const [instruction, setInstruction] = useState("");
-  const [asking, setAsking] = useState<RewritableSection | null>(null);
+  const [asking, setAsking] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<Proposal | null>(null);
   const [saving, startSaving] = useTransition();
 
   const edition = notes[lang];
 
-  const call = async (body: { section?: RewritableSection; instruction?: string }) => {
+  /** The title is a section for every purpose on this screen except storage. */
+  const titleDef: SectionDef = {
+    key: TITLE_KEY, label_fa: FIXED_LABELS.title.fa, label_en: FIXED_LABELS.title.en,
+    kind: "text", optional: false, brief: "",
+  };
+  const all = [titleDef, ...sections];
+
+  const valueOf = (def: SectionDef): unknown =>
+    def.key === TITLE_KEY
+      ? edition.title
+      : writeSectionValue(def.kind, edition.sections[def.key] ?? EMPTY_SECTION);
+
+  const ask = async (key: string, note: string) => {
     setProblem(null);
-    setBusy(body.section ? { what: "section", which: body.section } : { what: "draw" });
+    setBusy({ what: "section", which: key });
     try {
       const response = await fetch(`/api/meetings/${id}/notes`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ section: key, instruction: note }),
       });
       const answer = (await response.json().catch(() => ({}))) as {
-        ok?: boolean; reason?: string; detail?: string;
+        ok?: boolean; reason?: string; detail?: string; proposal?: Proposal;
       };
-      if (response.ok && answer.ok) {
+      if (response.ok && answer.ok && answer.proposal) {
+        setProposal(answer.proposal);
         setAsking(null);
+        setEditing(null);
+      } else {
+        setProblem(answer.detail ? `${answer.reason}: ${answer.detail}` : (answer.reason ?? `HTTP ${response.status}`));
+      }
+    } catch (error) {
+      setProblem(String(error));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const redraw = async (note: string) => {
+    setProblem(null);
+    setBusy({ what: "draw" });
+    try {
+      const response = await fetch(`/api/meetings/${id}/notes`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ instruction: note }),
+      });
+      const answer = (await response.json().catch(() => ({}))) as { ok?: boolean; reason?: string; detail?: string };
+      if (response.ok && answer.ok) {
         setInstruction("");
+        setProposal(null);
         router.refresh();
       } else {
         setProblem(answer.detail ? `${answer.reason}: ${answer.detail}` : (answer.reason ?? `HTTP ${response.status}`));
@@ -76,21 +132,50 @@ export function DraftView({
     }
   };
 
-  /** A list section is one line per line; the title and summary are prose. */
-  const asLines = (section: RewritableSection) => section !== "title" && section !== "summary";
+  const accept = () =>
+    startSaving(async () => {
+      if (!proposal) return;
+      const result = await acceptSection({
+        id, section: proposal.key, fa: proposal.after.fa, en: proposal.after.en,
+      });
+      if (result.ok) {
+        setProposal(null);
+        setInstruction("");
+        router.refresh();
+      } else setProblem(result.reason ?? "invalid");
+    });
 
-  const openEditor = (section: RewritableSection) => {
-    const value = sectionValue(notes, section, lang);
-    setDrafted(Array.isArray(value) ? value.join("\n") : String(value ?? ""));
-    setEditing(section);
+  /** Typing into a section: lines one per line, prose as prose, phases as `title | when | detail`. */
+  const asText = (kind: SectionKind, value: unknown): string => {
+    if (kind === "text") return String(value ?? "");
+    if (kind === "phases") {
+      const held = (value ?? {}) as { phases?: Phase[] ; scheduleNote?: string };
+      const rows = (held.phases ?? []).map((p) => [p.title, p.when, p.detail].join(" | "));
+      return [...rows, ...(held.scheduleNote ? ["", held.scheduleNote] : [])].join("\n");
+    }
+    return Array.isArray(value) ? (value as string[]).join("\n") : "";
   };
 
-  const save = (section: RewritableSection) =>
+  const fromText = (kind: SectionKind, raw: string): unknown => {
+    if (kind === "text") return raw.trim();
+    if (kind === "phases") {
+      const [rows, note] = raw.split(/\n\s*\n/);
+      const phases = (rows ?? "")
+        .split("\n")
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((l) => {
+          const [title = "", when = "", detail = ""] = l.split("|").map((p) => p.trim());
+          return { title, when, detail };
+        });
+      return { phases, scheduleNote: (note ?? "").trim() };
+    }
+    return raw.split("\n").map((l) => l.trim()).filter(Boolean);
+  };
+
+  const save = (def: SectionDef) =>
     startSaving(async () => {
-      const value = asLines(section)
-        ? drafted.split("\n").map((l) => l.trim()).filter(Boolean)
-        : drafted.trim();
-      const result = await saveSection({ id, section, lang, value });
+      const result = await saveSection({ id, section: def.key, lang, value: fromText(def.kind, drafted) });
       if (result.ok) {
         setEditing(null);
         router.refresh();
@@ -110,102 +195,245 @@ export function DraftView({
     borderRadius: "var(--radius-panel)",
   } as const;
 
-  /** One section: its heading, its lines, and the two ways to change it. */
-  const Section = ({ section, children }: { section: RewritableSection; children: React.ReactNode }) => (
-    <article className="border-t py-5" style={{ borderColor: "var(--line)" }}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-        <h3 className="text-sm">
-          {section === "title" ? t("titleSection") : SECTION_LABELS[section][lang]}
-        </h3>
-        <button
-          type="button"
-          onClick={() => (editing === section ? setEditing(null) : openEditor(section))}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px]"
-          style={{ border: "1px solid var(--line)", color: "var(--ink-faint)" }}
-        >
-          <Pencil className="h-3 w-3" />
-          {editing === section ? t("cancel") : t("edit")}
-        </button>
-        <button
-          type="button"
-          disabled={busy !== null}
-          onClick={() => setAsking(asking === section ? null : section)}
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-50"
-          style={{ border: "1px solid var(--line)", color: "var(--ink-faint)" }}
-        >
-          {busy?.what === "section" && busy.which === section ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <RefreshCw className="h-3 w-3" />
-          )}
-          {t("writeAgain")}
-        </button>
-      </div>
+  const chip = {
+    border: "1px solid var(--line)",
+    color: "var(--ink-faint)",
+  } as const;
 
-      {editing === section ? (
-        <div className="mt-3">
-          <textarea
-            value={drafted}
-            onChange={(e) => setDrafted(e.target.value)}
-            rows={Math.min(16, Math.max(4, drafted.split("\n").length + 1))}
-            className="w-full rounded-lg p-3 text-sm leading-relaxed"
-            style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
-          />
-          <p className="mt-1.5 text-[11px]" style={{ color: "var(--ink-faint)" }}>
-            {asLines(section) ? t("oneLine") : t("prose")}
-          </p>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => save(section)}
-            className="mt-2 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs disabled:opacity-60"
-            style={{ background: "var(--cool)", color: "var(--paper-raised)" }}
-          >
-            {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            {t("save")}
-          </button>
-        </div>
+  /** A section's value rendered for reading, whatever kind it is. */
+  const Value = ({ kind, value, muted }: { kind: SectionKind; value: unknown; muted?: boolean }) => {
+    const tone = muted ? { color: "var(--ink-faint)" } : undefined;
+    if (kind === "text") {
+      const held = String(value ?? "").trim();
+      return held ? (
+        <p className="text-sm leading-relaxed" style={tone}>{held}</p>
       ) : (
-        <div className="mt-2.5">{children}</div>
-      )}
-
-      {asking === section && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input
-            value={instruction}
-            onChange={(e) => setInstruction(e.target.value)}
-            placeholder={t("instructionHint")}
-            className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm"
-            style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
-          />
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={() => void call({ section, instruction })}
-            className="rounded-full px-4 py-2 text-xs disabled:opacity-60"
-            style={{ background: "var(--ink)", color: "var(--paper)" }}
-          >
-            {t("writeAgain")}
-          </button>
+        <p className="text-sm" style={{ color: "var(--ink-faint)" }}>{t("emptySection")}</p>
+      );
+    }
+    if (kind === "phases") {
+      const held = (value ?? {}) as { phases?: Phase[]; scheduleNote?: string };
+      const rows = held.phases ?? [];
+      if (rows.length === 0 && !held.scheduleNote) {
+        return <p className="text-sm" style={{ color: "var(--ink-faint)" }}>{t("emptySection")}</p>;
+      }
+      return (
+        <div className="flex flex-col gap-2.5">
+          {rows.map((p, i) => (
+            <div key={i}>
+              <p className="text-sm" style={tone}>
+                <span style={{ color: muted ? "var(--ink-faint)" : "var(--ink)" }}>{p.title}</span>
+                {p.when && (
+                  <span className="ms-2 rounded-full px-2 py-0.5 text-[11px]" style={{ background: "var(--paper-sunken)", color: "var(--ink-soft)" }}>
+                    {p.when}
+                  </span>
+                )}
+              </p>
+              {p.detail && (
+                <p className="mt-1 text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>{p.detail}</p>
+              )}
+            </div>
+          ))}
+          {held.scheduleNote && (
+            <p className="text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>{held.scheduleNote}</p>
+          )}
         </div>
-      )}
-    </article>
-  );
-
-  const Lines = ({ lines }: { lines: string[] }) =>
-    lines.length === 0 ? (
-      <p className="text-sm" style={{ color: "var(--ink-faint)" }}>
-        {t("emptySection")}
-      </p>
+      );
+    }
+    const lines = Array.isArray(value) ? (value as string[]) : [];
+    return lines.length === 0 ? (
+      <p className="text-sm" style={{ color: "var(--ink-faint)" }}>{t("emptySection")}</p>
     ) : (
       <div className="flex flex-col gap-2">
         {lines.map((line, i) => (
-          <p key={i} className="text-sm leading-relaxed">
-            {line}
-          </p>
+          <p key={i} className="text-sm leading-relaxed" style={tone}>{line}</p>
         ))}
       </div>
     );
+  };
+
+  /**
+   * What came back, against what is there.
+   *
+   * Two stacked panes rather than two columns: at 320 pixels a pair of columns
+   * is two narrow gutters of Persian, and the comparison a reviewer actually
+   * makes is sequential anyway — read the old, read the new, decide.
+   */
+  const Comparison = ({ def }: { def: SectionDef }) => {
+    if (!proposal || proposal.key !== def.key) return null;
+    return (
+      <div className="mt-3 overflow-hidden" style={{ ...panel, background: "var(--paper)" }}>
+        <div
+          className="flex items-center gap-2 px-4 py-2.5"
+          style={{ borderBottom: "1px solid var(--line)", background: "var(--paper-sunken)" }}
+        >
+          <Sparkles className="h-3.5 w-3.5" style={{ color: "var(--cool)" }} />
+          <span className="text-xs" style={{ color: "var(--ink-soft)" }}>{t("proposed")}</span>
+        </div>
+
+        <div className="p-4">
+          <p className="text-[11px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>{t("nowReads")}</p>
+          <div className="mt-2 opacity-70">
+            <Value kind={def.kind} value={proposal.before[lang]} muted />
+          </div>
+        </div>
+
+        <div className="p-4" style={{ borderTop: "1px solid var(--line)", background: "var(--paper-raised)" }}>
+          <p className="text-[11px] uppercase tracking-wide" style={{ color: "var(--cool)" }}>{t("wouldRead")}</p>
+          <div
+            className="mt-2 ps-3"
+            style={{ borderInlineStart: "2px solid var(--cool)" }}
+          >
+            <Value kind={def.kind} value={proposal.after[lang]} />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={saving}
+              onClick={accept}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs disabled:opacity-60"
+              style={{ background: "var(--cool)", color: "var(--paper-raised)" }}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              {t("accept")}
+            </button>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => { setProposal(null); setInstruction(""); }}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs disabled:opacity-60"
+              style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
+            >
+              <X className="h-3.5 w-3.5" />
+              {t("discard")}
+            </button>
+          </div>
+
+          {/* The instruction stays open under a proposal: not liking this one is
+              the commonest reason to have an instruction at all. */}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder={t("againHint")}
+              className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm"
+              style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
+            />
+            <button
+              type="button"
+              disabled={busy !== null || saving}
+              onClick={() => void ask(def.key, instruction)}
+              className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-xs disabled:opacity-60"
+              style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
+            >
+              {busy?.what === "section" && busy.which === def.key
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <RefreshCw className="h-3.5 w-3.5" />}
+              {t("again")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  /** One section: its heading, its lines, and the three ways to change it. */
+  const Section = ({ def }: { def: SectionDef }) => {
+    const value = valueOf(def);
+    const reviewing = proposal?.key === def.key;
+    const working = busy?.what === "section" && busy.which === def.key;
+
+    return (
+      <article className="border-t py-5" style={{ borderColor: "var(--line)" }}>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+          <h3 className="text-sm">{sectionLabel(def, lang)}</h3>
+
+          {def.optional && isEmptySection(edition.sections[def.key] ?? EMPTY_SECTION) && def.key !== TITLE_KEY && (
+            <span className="text-[11px]" style={{ color: "var(--ink-faint)" }}>{t("wontPrint")}</span>
+          )}
+
+          <button
+            type="button"
+            disabled={reviewing}
+            onClick={() => {
+              if (editing === def.key) return setEditing(null);
+              setDrafted(asText(def.kind, value));
+              setEditing(def.key);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-40"
+            style={chip}
+          >
+            <Pencil className="h-3 w-3" />
+            {editing === def.key ? t("cancel") : t("edit")}
+          </button>
+
+          <button
+            type="button"
+            disabled={busy !== null || reviewing}
+            onClick={() => setAsking(asking === def.key ? null : def.key)}
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-40"
+            style={chip}
+          >
+            {working ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+            {t("writeAgain")}
+          </button>
+        </div>
+
+        {editing === def.key ? (
+          <div className="mt-3">
+            <textarea
+              value={drafted}
+              onChange={(e) => setDrafted(e.target.value)}
+              rows={Math.min(16, Math.max(4, drafted.split("\n").length + 1))}
+              className="w-full rounded-lg p-3 text-sm leading-relaxed"
+              style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
+            />
+            <p className="mt-1.5 text-[11px]" style={{ color: "var(--ink-faint)" }}>
+              {def.kind === "phases" ? t("phaseLine") : def.kind === "text" ? t("prose") : t("oneLine")}
+            </p>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => save(def)}
+              className="mt-2 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs disabled:opacity-60"
+              style={{ background: "var(--cool)", color: "var(--paper-raised)" }}
+            >
+              {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+              {t("save")}
+            </button>
+          </div>
+        ) : (
+          <div className="mt-2.5" style={reviewing ? { opacity: 0.45 } : undefined}>
+            <Value kind={def.kind} value={value} />
+          </div>
+        )}
+
+        {asking === def.key && !reviewing && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <input
+              value={instruction}
+              onChange={(e) => setInstruction(e.target.value)}
+              placeholder={t("instructionHint")}
+              className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm"
+              style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
+            />
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void ask(def.key, instruction)}
+              className="rounded-full px-4 py-2 text-xs disabled:opacity-60"
+              style={{ background: "var(--ink)", color: "var(--paper)" }}
+            >
+              {t("writeAgain")}
+            </button>
+          </div>
+        )}
+
+        <Comparison def={def} />
+      </article>
+    );
+  };
 
   return (
     <section className="mt-10">
@@ -252,134 +480,72 @@ export function DraftView({
         </p>
       )}
 
-      <div className="mt-5" dir={lang === "fa" ? "rtl" : "ltr"}>
-        <Section section="title">
-          <p className="text-base">{edition.title || t("emptySection")}</p>
-          <p className="mt-1.5 text-xs" style={{ color: "var(--ink-faint)" }}>
-            {SECTION_LABELS.engagement[lang]}: {ENGAGEMENT_LABELS[edition.engagement][lang]}
-          </p>
-        </Section>
+      <p className="mt-5 text-xs" style={{ color: "var(--ink-faint)" }}>
+        {FIXED_LABELS.engagement[lang]}: {ENGAGEMENT_LABELS[edition.engagement][lang]}
+      </p>
 
-        <Section section="summary">
-          <p className="text-sm leading-relaxed">{edition.summary || t("emptySection")}</p>
-        </Section>
-
-        <Section section="phases">
-          {edition.phases.length === 0 ? (
-            <p className="text-sm" style={{ color: "var(--ink-faint)" }}>{t("emptySection")}</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {edition.phases.map((phase, i) => (
-                <div key={i}>
-                  <p className="text-sm">
-                    {phase.title}
-                    {phase.when ? (
-                      <span className="ms-2 text-xs tnum" style={{ color: "var(--warm)" }}>{phase.when}</span>
-                    ) : null}
-                  </p>
-                  <p className="mt-1 text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>
-                    {phase.detail}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
-          {edition.scheduleNote && (
-            <p className="mt-3 text-sm leading-relaxed" style={{ color: "var(--ink-soft)" }}>
-              {edition.scheduleNote}
-            </p>
-          )}
-        </Section>
-
-        {LIST_SECTIONS.map((section) => (
-          <Section key={section} section={section}>
-            <Lines lines={edition[section]} />
-          </Section>
+      <div className="mt-2">
+        {all.map((def) => (
+          <Section key={def.key} def={def} />
         ))}
-
-        <Section section="openQuestions">
-          <Lines lines={notes.openQuestions[lang]} />
-        </Section>
       </div>
 
-      {/* The model's own working. Shown because it is how a reviewer checks a
-          sentence against what was actually said, and it is the fastest way to
-          catch a figure that was not in the meeting. */}
-      {notes.facts.length > 0 && (
-        <details className="mt-6">
-          <summary className="cursor-pointer text-sm" style={{ color: "var(--ink-soft)" }}>
-            {SECTION_LABELS.facts[lang]} · {notes.facts.length}
-          </summary>
-          <div className="mt-3 flex flex-col gap-1.5 p-4" style={panel}>
-            {notes.facts.map((fact, i) => (
-              <p key={i} className="text-xs leading-relaxed" style={{ color: "var(--ink-soft)" }}>
-                {fact}
-              </p>
-            ))}
-          </div>
-        </details>
-      )}
-
-      {/* ── Redraw the whole thing, and decide ─────────────────────────────── */}
-      <div className="mt-8 flex flex-col gap-4 border-t pt-6" style={{ borderColor: "var(--line)" }}>
+      {/* ── Redraw the whole thing, and decide ─────────────────────────── */}
+      <div className="mt-6 flex flex-col gap-3 p-4" style={panel}>
         <div className="flex flex-wrap gap-2">
           <input
-            value={instruction}
+            value={proposal ? "" : instruction}
+            disabled={proposal !== null}
             onChange={(e) => setInstruction(e.target.value)}
             placeholder={t("redrawHint")}
-            className="min-w-0 flex-1 rounded-lg px-3 py-2.5 text-sm"
-            style={{ background: "var(--paper-raised)", border: "1px solid var(--line)", color: "var(--ink)" }}
+            className="min-w-0 flex-1 rounded-lg px-3 py-2 text-sm disabled:opacity-50"
+            style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
           />
           <button
             type="button"
-            disabled={busy !== null}
-            onClick={() => void call({ instruction })}
-            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm disabled:opacity-60"
+            disabled={busy !== null || proposal !== null}
+            onClick={() => void redraw(instruction)}
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs disabled:opacity-50"
             style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
           >
-            {busy?.what === "draw" ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            {busy?.what === "draw" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             {t("redraw")}
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {status !== "approved" && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => decide("approved")}
-              className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm disabled:opacity-60"
-              style={{ background: "var(--color-good)", color: "var(--paper-raised)" }}
-            >
-              <Check className="h-4 w-4" />
-              {t("approve")}
-            </button>
-          )}
-          {status !== "rejected" && (
-            <button
-              type="button"
-              disabled={saving}
-              onClick={() => decide("rejected")}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm disabled:opacity-60"
-              style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
-            >
-              <ThumbsDown className="h-4 w-4" />
-              {t("reject")}
-            </button>
-          )}
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={saving || status === "approved"}
+            onClick={() => decide("approved")}
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs disabled:opacity-50"
+            style={{ background: "var(--color-good)", color: "var(--paper-raised)" }}
+          >
+            <Check className="h-3.5 w-3.5" />
+            {t("approve")}
+          </button>
+          <button
+            type="button"
+            disabled={saving || status === "rejected"}
+            onClick={() => decide("rejected")}
+            className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs disabled:opacity-50"
+            style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
+          >
+            <ThumbsDown className="h-3.5 w-3.5" />
+            {t("reject")}
+          </button>
           {status !== "pending" && (
             <button
               type="button"
               disabled={saving}
               onClick={() => decide("pending")}
-              className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-sm disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs disabled:opacity-50"
               style={{ border: "1px solid var(--line)", color: "var(--ink-soft)" }}
             >
-              <Undo2 className="h-4 w-4 flip" />
-              {t("backToReview")}
+              <Undo2 className="h-3.5 w-3.5" />
+              {t("undecide")}
             </button>
           )}
-          {saving && <Loader2 className="h-4 w-4 animate-spin" style={{ color: "var(--ink-faint)" }} />}
         </div>
       </div>
     </section>

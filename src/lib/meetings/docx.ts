@@ -2,8 +2,8 @@ import {
   AlignmentType, Document, HeadingLevel, Packer, Paragraph, TextRun,
 } from "docx";
 import {
-  ENGAGEMENT_LABELS, LIST_SECTIONS, SECTION_LABELS,
-  type MeetingNotes, type NotesEdition, type NotesLang,
+  ENGAGEMENT_LABELS, FIXED_LABELS, EMPTY_SECTION, isEmptySection, sectionLabel,
+  type MeetingNotes, type NotesLang, type SectionDef, type SectionValue,
 } from "./notes-schema.ts";
 import { SPEAKER_LABELS, type Dialogue } from "./dialogue-schema.ts";
 import { durationLabel, meetingDate } from "./format.ts";
@@ -48,6 +48,8 @@ export type MeetingForDocument = {
   transcript: string | null;
   notes: MeetingNotes | null;
   dialogue: Dialogue | null;
+  /** The sections the meeting's template names, in its order. */
+  sections: SectionDef[];
 };
 
 export type DocumentPart = "transcript" | "dialogue" | "notes";
@@ -157,43 +159,44 @@ function dialogueBody(dialogue: Dialogue, lang: NotesLang): Paragraph[] {
   return out;
 }
 
-/** The phases, which the proposal prints between deliverables and the money. */
-function phases(e: NotesEdition, lang: NotesLang): Paragraph[] {
-  if (!e.phases.length && !e.scheduleNote) return [];
-  const out = [para(SECTION_LABELS.phases[lang], lang, { heading: HeadingLevel.HEADING_2 })];
-  for (const ph of e.phases) {
-    const when = ph.when ? ` (${ph.when})` : "";
-    const detail = ph.detail ? ` — ${ph.detail}` : "";
-    out.push(para(`${ph.title}${when}${detail}`, lang, { bullet: true }));
+/**
+ * One section, whatever kind it is.
+ *
+ * The order, the headings and the kinds all come from the template now, so this
+ * is a loop where it used to be a list of named fields — which is the whole
+ * point: a clause a studio added last week prints here without this file
+ * knowing its name.
+ */
+function section(value: SectionValue, def: SectionDef, lang: NotesLang): Paragraph[] {
+  const out = [para(sectionLabel(def, lang), lang, { heading: HeadingLevel.HEADING_2 })];
+  if (def.kind === "text") {
+    if (value.text) out.push(para(value.text, lang));
+    return out;
   }
-  if (e.scheduleNote) out.push(para(e.scheduleNote, lang));
+  if (def.kind === "phases") {
+    for (const ph of value.phases) {
+      const when = ph.when ? ` (${ph.when})` : "";
+      const detail = ph.detail ? ` — ${ph.detail}` : "";
+      out.push(para(`${ph.title}${when}${detail}`, lang, { bullet: true }));
+    }
+    if (value.scheduleNote) out.push(para(value.scheduleNote, lang));
+    return out;
+  }
+  for (const line of value.lines) out.push(para(line, lang, { bullet: true }));
   return out;
 }
 
-function edition(notes: MeetingNotes, lang: NotesLang): Paragraph[] {
+function edition(notes: MeetingNotes, sections: readonly SectionDef[], lang: NotesLang): Paragraph[] {
   const e = notes[lang];
-  const out: Paragraph[] = [];
-  const h = (key: keyof typeof SECTION_LABELS) =>
-    para(SECTION_LABELS[key][lang], lang, { heading: HeadingLevel.HEADING_2 });
-
-  out.push(para(
-    `${SECTION_LABELS.engagement[lang]}: ${ENGAGEMENT_LABELS[e.engagement][lang]}`,
-    lang, { muted: true },
-  ));
-  if (e.summary) out.push(h("summary"), para(e.summary, lang));
-
-  for (const key of LIST_SECTIONS) {
-    if (key === "budget") out.push(...phases(e, lang));
-    const lines = e[key];
-    if (!lines.length) continue;
-    out.push(h(key));
-    for (const line of lines) out.push(para(line, lang, { bullet: true }));
-  }
-
-  const open = notes.openQuestions[lang];
-  if (open.length) {
-    out.push(h("openQuestions"));
-    for (const line of open) out.push(para(line, lang, { bullet: true }));
+  const out: Paragraph[] = [
+    para(`${FIXED_LABELS.engagement[lang]}: ${ENGAGEMENT_LABELS[e.engagement][lang]}`, lang, { muted: true }),
+  ];
+  for (const def of sections) {
+    const value = e.sections[def.key] ?? EMPTY_SECTION;
+    // An empty section is dropped whatever `optional` says, because a heading
+    // with nothing under it in a document a client receives reads as a mistake.
+    if (isEmptySection(value)) continue;
+    out.push(...section(value, def, lang));
   }
   return out;
 }
@@ -208,7 +211,7 @@ export async function buildMeetingDocx(input: {
   const body =
     part === "transcript" ? transcriptBody(meeting.transcript ?? "", lang)
     : part === "dialogue" ? (meeting.dialogue ? dialogueBody(meeting.dialogue, lang) : [])
-    : meeting.notes ? edition(meeting.notes, lang) : [];
+    : meeting.notes ? edition(meeting.notes, meeting.sections, lang) : [];
 
   const doc = new Document({
     creator: studioName(studio, lang) || "Shenava",

@@ -4,56 +4,87 @@ import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { readLastJson } from "./text.ts";
 import {
-  MeetingNotesSchema, NOTES_LANGS, SECTION_LABELS, sectionShape, sectionValue,
-  sectionValueSchema, withSection, type MeetingNotes, type RewritableSection,
+  FIXED_LABELS, NOTES_LANGS, parseNotes, sectionLabel, sectionShape, sectionValue,
+  writeSectionValue, type MeetingNotes, type NotesLang, type SectionDef,
 } from "./notes-schema.ts";
-import { PROPOSAL_GUIDE } from "./proposal-guide.ts";
+import { sectionGuide } from "./proposal-guide.ts";
 import { materialBlock } from "./notes.ts";
+import { readSectionsFor } from "./templates-read.ts";
 import { ask, ceilingFor, loadMaterial, openSeat, record, retryNote, type Refusal } from "./seat.ts";
 
 /**
  * One section, written again — in both editions, with the rest of the draft as
- * context and nothing else touched.
+ * context, and NOTHING SAVED.
+ *
+ * WHY IT DOES NOT SAVE. It used to, and that made a rewrite a gamble: the lines
+ * you had were gone the moment the new ones arrived, and a rewrite that came
+ * back worse cost you the version you were happy with. So this returns what it
+ * would write and the reviewer decides. Accepting is `applySection`, which
+ * takes no model and costs nothing, and is the only thing that writes.
  *
  * WHY A SECTION AND NOT THE WHOLE DRAFT. Redrawing a long meeting costs two
  * minutes and fifteen cents and rewrites twelve sections to change one. And the
  * reviewer's complaint is almost always about one: the summary is too long, the
  * phases are in the wrong order, the exclusions missed the thing the client
- * insisted on. So the section goes back on its own, the whole draft goes with it
- * as context so the new lines still sound like their neighbours, and the merge
- * is a pure function that the tests exercise without a model.
+ * insisted on.
  */
 
-export type RewriteResult =
-  | { ok: true; notes: MeetingNotes; costUsd: number }
+/** The title is rewritable and belongs to no template, so it carries its own definition. */
+export const TITLE_SECTION: SectionDef = {
+  key: "title",
+  label_fa: FIXED_LABELS.title.fa,
+  label_en: FIXED_LABELS.title.en,
+  kind: "text",
+  optional: false,
+  brief: "the engagement in a few words, as the proposal's heading.",
+};
+
+export type SectionProposal = {
+  key: string;
+  before: Record<NotesLang, unknown>;
+  after: Record<NotesLang, unknown>;
+};
+
+export type ProposeResult =
+  | { ok: true; proposal: SectionProposal; costUsd: number }
   | { ok: false; reason: Refusal; detail?: string };
 
-export async function rewriteSection(
+/** Every section a reviewer may have written again: the template's, plus the title. */
+export async function rewritableSections(templateId: string | null): Promise<SectionDef[]> {
+  return [TITLE_SECTION, ...(await readSectionsFor(templateId))];
+}
+
+export async function proposeSection(
   meetingId: string,
-  section: RewritableSection,
+  key: string,
   instruction: string,
-): Promise<RewriteResult> {
+): Promise<ProposeResult> {
   const loaded = await loadMaterial(meetingId);
   if (!loaded.ok) return loaded;
   const { meeting } = loaded;
 
   const supabase = db();
   if (!supabase) return { ok: false, reason: "no_database" };
+
+  const sections = await readSectionsFor(meeting.templateId);
+  const all = [TITLE_SECTION, ...sections];
+  const section = all.find((s) => s.key === key);
+  if (!section) return { ok: false, reason: "unreadable", detail: `no section «${key}» on this template` };
+
   const { data: row } = await supabase
     .from("shenava_meetings")
     .select("notes")
     .eq("id", meetingId)
     .maybeSingle();
-  const held = row?.notes ? MeetingNotesSchema.safeParse(row.notes) : null;
+  const held = row?.notes ? parseNotes(row.notes, sections) : null;
   if (!held?.success) return { ok: false, reason: "no_dialogue", detail: "there is no draft to rewrite" };
-  const notes = held.data;
+  const notes = held.data as MeetingNotes;
 
   const settings = await getSettings();
-  const heading = SECTION_LABELS[section === "title" ? "summary" : section];
 
   const system = `You are revising ONE section of a proposal draft that has already been written from a consultation. You return that section only, in both languages, and nothing else.
 
-${PROPOSAL_GUIDE}
+${sectionGuide(sections)}
 
 Rules that do not bend:
 - Return only the section asked for, in the shape given, in both editions.
@@ -63,21 +94,34 @@ Rules that do not bend:
 - Keep the voice of the rest of the draft, which is shown to you below.
 
 Return JSON only, in exactly this shape:
-${sectionShape(section)}`;
+{ "fa": ${sectionShape(section.kind)}, "en": ${sectionShape(section.kind)} }`;
 
-  const current = NOTES_LANGS.map(
-    (lang) => `${lang}: ${JSON.stringify(sectionValue(notes, section, lang))}`,
-  ).join("\n");
+  const before = Object.fromEntries(
+    NOTES_LANGS.map((lang) => [lang, sectionValue(notes, key, section.kind, lang)]),
+  ) as Record<NotesLang, unknown>;
+
+  const whole = Object.fromEntries(
+    NOTES_LANGS.map((lang) => [
+      lang,
+      {
+        title: notes[lang].title,
+        sections: Object.fromEntries(
+          sections.map((s) => [s.key, writeSectionValue(s.kind, notes[lang].sections[s.key] ?? { text: "", lines: [], phases: [], scheduleNote: "" })]),
+        ),
+      },
+    ]),
+  );
 
   const prompt = [
     materialBlock(meeting),
     "",
-    `The whole draft as it stands, for voice and for what the other sections already say:`,
-    JSON.stringify({ fa: notes.fa, en: notes.en, openQuestions: notes.openQuestions }),
+    "The whole draft as it stands, for voice and for what the other sections already say:",
+    JSON.stringify(whole),
     "",
-    `The section to write again: ${section} — «${heading.fa}» / "${heading.en}".`,
+    `The section to write again: ${key} — «${sectionLabel(section, "fa")}» / "${sectionLabel(section, "en")}".`,
+    `What that section is for: ${section.brief}`,
     "It currently reads:",
-    current,
+    NOTES_LANGS.map((lang) => `${lang}: ${JSON.stringify(before[lang])}`).join("\n"),
     "",
     instruction.trim()
       ? `The reviewer's instruction, which governs:\n${instruction.trim()}`
@@ -90,14 +134,11 @@ ${sectionShape(section)}`;
 
   const totals = { tokensIn: 0, tokensOut: 0, costUsd: 0, ms: 0 };
   let problem = "";
-  let values: Record<string, unknown> | null = null;
+  let after: Record<NotesLang, unknown> | null = null;
 
-  const AnswerSchema = z.object({
-    fa: sectionValueSchema(section),
-    en: sectionValueSchema(section),
-  });
+  const AnswerSchema = z.object({ fa: z.unknown(), en: z.unknown() });
 
-  for (let attempt = 1; attempt <= 2 && values === null; attempt += 1) {
+  for (let attempt = 1; attempt <= 2 && after === null; attempt += 1) {
     const answer = await ask(
       seat,
       attempt === 1 ? prompt : prompt + retryNote(problem),
@@ -122,23 +163,12 @@ ${sectionShape(section)}`;
       problem = parsed.error.issues[0]?.message ?? "the shape was wrong";
       continue;
     }
-    values = { fa: parsed.data.fa, en: parsed.data.en };
+    after = { fa: parsed.data.fa, en: parsed.data.en };
   }
 
-  await record(meetingId, "section", settings.writerModel, totals, values !== null, section, values === null ? problem : undefined);
-  if (values === null) return { ok: false, reason: "unreadable", detail: problem };
+  await record(meetingId, "section", settings.writerModel, totals, after !== null, key, after === null ? problem : undefined);
+  if (after === null) return { ok: false, reason: "unreadable", detail: problem };
 
-  const next = withSection(notes, section, values as Record<"fa" | "en", unknown>);
-  await supabase
-    .from("shenava_meetings")
-    .update({
-      notes: next,
-      notes_edited_at: new Date().toISOString(),
-      // Rewritten means unreviewed again.
-      draft_status: "pending",
-      draft_decided_at: null,
-    })
-    .eq("id", meetingId);
-
-  return { ok: true, notes: next, costUsd: totals.costUsd };
+  // Nothing is written. The reviewer compares and decides; `applySection` saves.
+  return { ok: true, proposal: { key, before, after }, costUsd: totals.costUsd };
 }

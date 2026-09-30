@@ -50,7 +50,7 @@ ever a wrong label, never lost text. The page lets you correct a label by
 hand, split a turn sentence by sentence, or swap both sides at once.
 
 **Pass three — the draft.** A model reads the labelled dialogue and writes the
-proposal draft under eleven fixed headings, in both languages at once, plus two
+proposal draft under the headings its template names — twelve by default, in both languages at once, plus two
 keys that settle what the document is: a `title`, and an `engagement` of
 `project`, `consulting`, `training` or `retainer` — which is what chooses the
 suggested template. It is
@@ -224,7 +224,7 @@ tagged by seat. The spending ceilings are read from **here**, not from the
 figure on the meeting row, because a meeting redrawn next month must not count
 against last month's ceiling.
 
-**`shenava_templates`** — the shape of the document a draft is poured into:
+**`shenava_templates`** — the sections a proposal has, which is also what the writer is asked for:
 which sections, in which order, under which headings, in both languages. Plus
 `house_lines`, the lines your proposals always end with; the writer is told
 about them so it never proposes them itself.

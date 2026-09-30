@@ -233,7 +233,7 @@ were made differently once and corrected.
 >
 > Two keys settle what the document is — `title`, the engagement in a few words,
 > and `engagement`, one of `project|consulting|training|retainer|unknown`, which
-> is what chooses the suggested template. Then **eleven sections**, in this
+> is what chooses the suggested template. Then the sections its TEMPLATE names — **twelve by default**, in this
 > order, with these headings in both languages, each wanting exactly what is
 > described:
 >
@@ -268,6 +268,12 @@ were made differently once and corrected.
 >
 > `assumptions` — «پیش‌فرض‌ها» / Assumptions. Accesses, data, a person on their
 > side, a tool staying as it is — said or plainly implied.
+>
+> `whyUs` — «چرا ما» / Why us. Why this studio and why this way — **only**
+> from what the consultant said in the room about how they work, what they have
+> built before, or why they proposed it in this shape. Never a year count, a
+> client list or a credential the meeting did not contain. Empty is a correct
+> answer: a studio's standing lines belong on its template.
 >
 > `nextSteps` — «گام‌های بعدی» / Next steps. What the two sides agreed to do
 > next, in order.

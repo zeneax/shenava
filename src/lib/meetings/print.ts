@@ -1,6 +1,6 @@
 import {
-  ENGAGEMENT_LABELS, LIST_SECTIONS, SECTION_LABELS,
-  type MeetingNotes, type NotesEdition, type NotesLang,
+  ENGAGEMENT_LABELS, FIXED_LABELS, EMPTY_SECTION, isEmptySection, sectionLabel,
+  type MeetingNotes, type NotesLang, type SectionDef, type SectionValue,
 } from "./notes-schema.ts";
 import { SPEAKER_LABELS, type Dialogue } from "./dialogue-schema.ts";
 import { durationLabel, meetingDate } from "./format.ts";
@@ -54,35 +54,33 @@ function list(lines: string[]): string {
   return `<ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`;
 }
 
-function phases(e: NotesEdition, lang: NotesLang): string {
-  if (!e.phases.length && !e.scheduleNote) return "";
-  const items = e.phases.map((ph) => {
-    const when = ph.when ? ` (${ph.when})` : "";
-    const detail = ph.detail ? ` — ${ph.detail}` : "";
-    return `${ph.title}${when}${detail}`;
-  });
-  return [
-    `<h2>${esc(SECTION_LABELS.phases[lang])}</h2>`,
-    items.length ? list(items) : "",
-    e.scheduleNote ? `<p>${esc(e.scheduleNote)}</p>` : "",
-  ].join("\n");
+/** One section, whatever kind it is. The order and headings come from the template. */
+function section(value: SectionValue, def: SectionDef, lang: NotesLang): string {
+  const heading = `<h2>${esc(sectionLabel(def, lang))}</h2>`;
+  if (def.kind === "text") return [heading, `<p>${esc(value.text)}</p>`].join("\n");
+  if (def.kind === "phases") {
+    const items = value.phases.map((ph) => {
+      const when = ph.when ? ` (${ph.when})` : "";
+      const detail = ph.detail ? ` — ${ph.detail}` : "";
+      return `${ph.title}${when}${detail}`;
+    });
+    return [heading, items.length ? list(items) : "", value.scheduleNote ? `<p>${esc(value.scheduleNote)}</p>` : ""]
+      .filter(Boolean)
+      .join("\n");
+  }
+  return [heading, list(value.lines)].join("\n");
 }
 
-function edition(notes: MeetingNotes, lang: NotesLang): string {
+function edition(notes: MeetingNotes, sections: readonly SectionDef[], lang: NotesLang): string {
   const e = notes[lang];
-  const parts: string[] = [];
-  const h = (key: keyof typeof SECTION_LABELS) => `<h2>${esc(SECTION_LABELS[key][lang])}</h2>`;
-
-  parts.push(`<p class="muted">${esc(SECTION_LABELS.engagement[lang])}: ${esc(ENGAGEMENT_LABELS[e.engagement][lang])}</p>`);
-  if (e.summary) parts.push(h("summary"), `<p>${esc(e.summary)}</p>`);
-
-  for (const key of LIST_SECTIONS) {
-    if (key === "budget") parts.push(phases(e, lang));
-    if (!e[key].length) continue;
-    parts.push(h(key), list(e[key]));
+  const parts = [
+    `<p class="muted">${esc(FIXED_LABELS.engagement[lang])}: ${esc(ENGAGEMENT_LABELS[e.engagement][lang])}</p>`,
+  ];
+  for (const def of sections) {
+    const value = e.sections[def.key] ?? EMPTY_SECTION;
+    if (isEmptySection(value)) continue;
+    parts.push(section(value, def, lang));
   }
-  const open = notes.openQuestions[lang];
-  if (open.length) parts.push(h("openQuestions"), list(open));
   return parts.filter(Boolean).join("\n");
 }
 
@@ -107,7 +105,7 @@ export function renderMeetingPrint(input: {
   const body =
     part === "transcript" ? paragraphs(meeting.transcript ?? "")
     : part === "dialogue" ? (meeting.dialogue ? dialogueBody(meeting.dialogue, lang) : "")
-    : meeting.notes ? edition(meeting.notes, lang) : "";
+    : meeting.notes ? edition(meeting.notes, meeting.sections, lang) : "";
 
   const hint = lang === "fa" ? "برای PDF: چاپ ← ذخیره به‌صورت PDF" : "For a PDF: Print → Save as PDF";
   // The studio's own name, or nothing at all. A document a client receives must

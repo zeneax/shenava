@@ -3,12 +3,10 @@ import { db } from "@/lib/db";
 import { getSettings, type Settings } from "@/lib/settings";
 import { readLastJson } from "./text.ts";
 
-export { PROPOSAL_GUIDE };
 import { DialogueSchema, dialogueAsText } from "./dialogue-schema.ts";
-import {
-  MeetingNotesSchema, NOTES_SHAPE, type MeetingNotes,
-} from "./notes-schema.ts";
-import { PROPOSAL_GUIDE } from "./proposal-guide.ts";
+import { notesShape, parseNotes, type MeetingNotes, type SectionDef } from "./notes-schema.ts";
+import { sectionGuide } from "./proposal-guide.ts";
+import { readSectionsFor } from "./templates-read.ts";
 import { ask, ceilingFor, loadMaterial, openSeat, record, retryNote, MATERIAL_GUARD, type Material, type Refusal } from "./seat.ts";
 
 /**
@@ -33,7 +31,7 @@ export type NotesResult =
  * source to get that. An empty name reads as "the studio", which is neutral and
  * correct rather than a placeholder leaking into a client's document.
  */
-function systemPrompt(settings: Settings, houseLines: string[]): string {
+function systemPrompt(settings: Settings, houseLines: string[], sections: readonly SectionDef[]): string {
   const name = settings.studioName.trim();
   const nameFa = settings.studioNameFa.trim();
   const named =
@@ -45,7 +43,7 @@ function systemPrompt(settings: Settings, houseLines: string[]): string {
 
 The voice is engineered, direct, restrained and specific. No exclamation marks, no emoji, no "transform", no "revolutionary", no "AI-powered" as a benefit. ${named} The studio speaks as "we" (ما) and addresses the client as "you" (شما).${settings.studioVoice.trim() ? `\n\nThe studio's own note on how it writes, which governs where it applies:\n${settings.studioVoice.trim()}` : ""}
 
-${PROPOSAL_GUIDE}
+${sectionGuide(sections)}
 
 What you write, and what you do not:
 - Every line under a section is a finished, formal, fluent sentence that could stand in the proposal unchanged. Not a note, not a fragment, not a heading. Persian lines are Persian prose: short sentences, «می‌شود» and «است», never «می‌باشد», no English sentence structure.
@@ -61,7 +59,7 @@ How you work:
 3. Then list what the meeting did not settle, in both languages, under "openQuestions".
 
 Return JSON only, in exactly this shape, and no other text:
-${NOTES_SHAPE}`;
+${notesShape(sections)}`;
 }
 
 /**
@@ -117,7 +115,10 @@ export async function draftNotes(
 
   const settings = await getSettings();
   const houseLines = await houseLinesFor();
-  const opened = await openSeat(systemPrompt(settings, houseLines));
+  // The sections the WRITER is asked for come from the meeting's template, so
+  // adding a clause on the templates page and redrawing is the whole loop.
+  const sections = await readSectionsFor(meeting.templateId);
+  const opened = await openSeat(systemPrompt(settings, houseLines, sections));
   if (!opened.ok) return opened;
   const { seat } = opened;
   const model = settings.writerModel;
@@ -162,7 +163,7 @@ export async function draftNotes(
       problem = "no JSON object in it";
       continue;
     }
-    const parsed = MeetingNotesSchema.safeParse(object);
+    const parsed = parseNotes(object, sections);
     if (!parsed.success) {
       problem = parsed.error.issues[0]?.message ?? "the shape was wrong";
       continue;

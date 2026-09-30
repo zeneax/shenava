@@ -30,7 +30,7 @@ answer is only ever a wrong label. You can fix a label, split a turn sentence by
 sentence, or swap both sides — none of which calls a model.
 
 **Three — the draft.** A model reads the labelled dialogue and writes the
-proposal under eleven headings, in both languages at once, as finished sentences
+proposal under twelve headings, in both languages at once, as finished sentences
 you could paste into a document. It is told never to invent a price, a date or a
 number: what the meeting left unsettled goes under *open questions*.
 
@@ -402,7 +402,7 @@ are most of what that code is for.
 [`prompts/BUILD-PROMPT.md`](prompts/BUILD-PROMPT.md) is a complete instruction
 for a coding agent to build this project from an empty folder — the stack, the
 two cutting modes with their real numbers, the three failure modes of live
-transcription providers, the eleven proposal sections, the writer's rules, the
+transcription providers, the template-owned proposal sections, the writer's rules, the
 schema, the screens, the setup script and the order of work. Running it produces
 this application, including the `AGENTS.md` that tells the next agent how to
 change it.

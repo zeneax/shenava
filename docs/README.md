@@ -18,6 +18,12 @@ whose whole message is `[object Object]` because something rejected with a value
 that was not an `Error` — and which, once it could name itself, turned out to be
 a wallet extension injected into the page.
 
+**[`a-shape-the-database-accepts.md`](a-shape-the-database-accepts.md)** — a
+`jsonb` column has no shape, so the database takes a dialogue the application
+will not read, and every reader degrades politely instead of complaining. The
+sample meeting carried one for a while. The note ends with the check to run
+against any hand-written `jsonb`.
+
 **[`when-a-pass-blames-the-model.md`](when-a-pass-blames-the-model.md)** — the
 speaker pass telling you to change your model in the settings, when what had
 actually happened was an answer stopped at a fixed output ceiling. The ledger

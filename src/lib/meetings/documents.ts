@@ -2,7 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings";
 import { DialogueSchema } from "./dialogue-schema.ts";
-import { MeetingNotesSchema } from "./notes-schema.ts";
+import { parseNotes } from "./notes-schema.ts";
+import { readSectionsFor } from "./templates-read.ts";
 import type { MeetingForDocument, Studio } from "./docx.ts";
 
 /**
@@ -17,14 +18,18 @@ export async function loadForDocument(
   if (!supabase) return null;
   const { data } = await supabase
     .from("shenava_meetings")
-    .select("title,client_name,created_at,duration_ms,transcript,dialogue,notes")
+    .select("title,client_name,created_at,duration_ms,transcript,dialogue,notes,template_id")
     .eq("id", id)
     .maybeSingle();
   if (!data) return null;
 
   const settings = await getSettings();
   const dialogue = data.dialogue ? DialogueSchema.safeParse(data.dialogue) : null;
-  const notes = data.notes ? MeetingNotesSchema.safeParse(data.notes) : null;
+  // The sections come from the meeting's template, so a document prints the
+  // clauses that template names — including ones added after the draft was
+  // written, which then print empty rather than not at all.
+  const sections = await readSectionsFor((data.template_id as string | null) ?? null);
+  const notes = data.notes ? parseNotes(data.notes, sections) : null;
 
   return {
     meeting: {
@@ -35,6 +40,7 @@ export async function loadForDocument(
       transcript: data.transcript,
       dialogue: dialogue?.success ? dialogue.data : null,
       notes: notes?.success ? notes.data : null,
+      sections,
     },
     studio: { name: settings.studioName, nameFa: settings.studioNameFa },
   };

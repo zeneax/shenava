@@ -334,7 +334,7 @@ for.
 
 ## ⑫ The draft
 
-One call, both languages at once, eleven fixed headings, finished formal
+One call, both languages at once, the template's headings, finished formal
 sentences that could stand in the proposal unchanged.
 
 The model writes a list of **facts** first — who said what, every number, name,

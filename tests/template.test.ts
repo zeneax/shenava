@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  TemplateSchema, nextNumber, pour, suggestTemplate, templateName, TEMPLATE_KEYS,
+  TemplateSchema, nextNumber, pour, suggestTemplate, templateName, templateSections,
 } from "../src/lib/meetings/template.ts";
-import { MeetingNotesSchema, LIST_SECTIONS } from "../src/lib/meetings/notes-schema.ts";
+import { parseNotes, DEFAULT_SECTIONS } from "../src/lib/meetings/notes-schema.ts";
 import { documentFileName, durationLabel } from "../src/lib/meetings/format.ts";
 
 const template = TemplateSchema.parse({
@@ -22,7 +22,7 @@ const template = TemplateSchema.parse({
   house_lines: { fa: ["این پیشنهاد سی روز اعتبار دارد."], en: ["This proposal is valid for thirty days."] },
 });
 
-const notes = MeetingNotesSchema.parse({
+const notes = parseNotes({
   fa: {
     title: "عنوان فارسی", engagement: "project", summary: "خلاصهٔ فارسی.",
     goals: ["هدف یک", "هدف دو"],
@@ -38,7 +38,7 @@ const notes = MeetingNotesSchema.parse({
     assumptions: ["One assumption"],
   },
   openQuestions: { fa: ["پرسش"], en: ["A question"] },
-});
+}, DEFAULT_SECTIONS).data!;
 
 test("the poured sections follow the template's order, not the draft's", () => {
   const poured = pour(notes, template, "en");
@@ -50,7 +50,7 @@ test("an optional section the meeting left empty is dropped; a required one is k
   // exclusions is empty AND optional, so it is gone.
   assert.equal(poured.sections.find((s) => s.key === "exclusions"), undefined);
   // assumptions has content; make a version where it does not and check it stays.
-  const bare = MeetingNotesSchema.parse({ fa: {}, en: {} });
+  const bare = parseNotes({ fa: {}, en: {} }, DEFAULT_SECTIONS).data!;
   const barePoured = pour(bare, template, "en");
   const kept = barePoured.sections.find((s) => s.key === "assumptions");
   assert.ok(kept, "a required empty section must still be printed, so the reader sees it is empty");
@@ -103,15 +103,51 @@ test("a template naming a key the draft does not have prints nothing rather than
   assert.deepEqual(poured.sections[1]!.lines, []);
 });
 
-test("every key a template may print is one the draft actually holds", () => {
-  // The guard against the two drifting apart: the template's vocabulary is the
-  // draft's own keys plus the two that live outside an edition.
-  for (const key of TEMPLATE_KEYS) {
-    const known =
-      key === "summary" || key === "phases" || key === "openQuestions" ||
-      (LIST_SECTIONS as readonly string[]).includes(key);
-    assert.ok(known, `${key} is not a section the draft has`);
-  }
+test("a section a studio invented is poured like any other", () => {
+  // The whole point of the template owning the list: a key this code has never
+  // heard of goes in, comes out, and prints.
+  const mine = TemplateSchema.parse({
+    id: "t4",
+    sections: [{ key: "risks", label_fa: "ریسک‌ها", label_en: "Risks", kind: "lines", brief: "what could go wrong." }],
+  });
+  const drafted = parseNotes({
+    fa: { sections: { risks: ["اگر صفحه‌گسترده مرتب نباشد."] } },
+    en: { sections: { risks: ["If the spreadsheet is not tidy."] } },
+  }, templateSections(mine)).data!;
+  const poured = pour(drafted, mine, "fa");
+  assert.deepEqual(poured.sections.map((s) => s.key), ["risks"]);
+  assert.equal(poured.sections[0]!.heading, "ریسک‌ها");
+  assert.deepEqual(poured.sections[0]!.lines, ["اگر صفحه‌گسترده مرتب نباشد."]);
+});
+
+test("a template with no sections falls back to the built-in ones rather than printing nothing", () => {
+  // An empty list is what a half-finished edit looks like, and the cost of
+  // guessing wrong is a proposal with nothing in it.
+  const empty = TemplateSchema.parse({ id: "t5", sections: [] });
+  assert.deepEqual(templateSections(empty).map((s) => s.key), DEFAULT_SECTIONS.map((s) => s.key));
+  assert.ok(pour(notes, empty, "fa").sections.length > 0);
+});
+
+test("a section a studio added without saying what it wants still gets a brief", () => {
+  const vague = TemplateSchema.parse({
+    id: "t6",
+    sections: [{ key: "risks", label_fa: "ریسک‌ها", label_en: "Risks", kind: "lines" }],
+  });
+  const brief = templateSections(vague)[0]!.brief;
+  assert.ok(brief.length > 0, "the writer would be asked for a key with no instruction");
+  assert.match(brief, /ریسک‌ها/, "the heading is the best guess there is");
+});
+
+test("one key twice over is one section, not two", () => {
+  const twice = TemplateSchema.parse({
+    id: "t7",
+    sections: [
+      { key: "goals", label_en: "Goals", kind: "lines" },
+      { key: "goals", label_en: "Goals again", kind: "text" },
+    ],
+  });
+  assert.equal(twice.sections.length, 1);
+  assert.equal(twice.sections[0]!.label_en, "Goals");
 });
 
 test("the suggestion prefers a template made for the draft's engagement", () => {

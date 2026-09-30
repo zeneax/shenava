@@ -1,38 +1,41 @@
 import { z } from "zod";
 import { clampText } from "./text.ts";
 import { LANGS, type Lang } from "./langs.ts";
-import { ENGAGEMENTS, LIST_SECTIONS, type Engagement, type MeetingNotes } from "./notes-schema.ts";
+import {
+  DEFAULT_SECTIONS, EMPTY_SECTION, ENGAGEMENTS, isEmptySection, safeKey, sectionLabel,
+  type Engagement, type MeetingNotes, type SectionDef, type SectionKind, type SectionValue,
+} from "./notes-schema.ts";
+import { SECTION_KINDS } from "./proposal-guide.ts";
 
 /**
- * A proposal template: the shape of the document a draft is poured into.
+ * A proposal template: which sections a proposal has, what each one asks the
+ * writer for, and the lines the document always ends with.
  *
- * WHY A TEMPLATE AT ALL, when the draft already has eleven sections. Because
- * they are not the same thing. The draft is what the MEETING supports; the
- * template is what YOUR proposals look like — which sections you print, in what
- * order, under what headings, and the lines you always end with. Two studios
- * reading the same meeting should get the same draft and different documents.
+ * IT USED TO DESCRIBE ONLY THE PRINTING. The writer produced twelve fixed
+ * sections and a template chose which of them to show, under what headings, in
+ * what order — so a studio could rename a heading but never add a clause, and
+ * "add a clause" is the thing studios actually want. Now the template owns the
+ * list: its sections are what the writer is asked for, what the draft stores,
+ * what the page shows and what the document prints, and `brief` is the sentence
+ * the writer is given for each one.
  *
- * The section keys are the draft's own keys, so pouring is a copy and not a
- * mapping. A template naming a key the draft does not have prints nothing for it
- * rather than failing, because a template outliving a schema change is the
- * normal case and a document that refuses to print is not.
+ * A TEMPLATE WITH NO SECTIONS FALLS BACK TO THE BUILT-IN TWELVE rather than
+ * producing an empty document. An empty list is what a half-finished edit looks
+ * like, and the cost of guessing wrong here is a proposal with nothing in it.
  *
  * Client-safe and pure: the page renders from this and the tests exercise it.
  */
 
-export const SECTION_KINDS = ["text", "lines", "phases"] as const;
-export type SectionKind = (typeof SECTION_KINDS)[number];
-
-/** Every key a template may print, in the order the draft holds them. */
-export const TEMPLATE_KEYS = ["summary", ...LIST_SECTIONS, "phases", "openQuestions"] as const;
-export type TemplateKey = (typeof TEMPLATE_KEYS)[number];
+export { SECTION_KINDS, type SectionKind, type SectionDef };
 
 export const TemplateSectionSchema = z.object({
-  key: z.string().transform((s) => clampText(s, 40)),
+  key: z.string().transform(safeKey),
   label_fa: z.string().default("").transform((s) => clampText(s, 120)),
   label_en: z.string().default("").transform((s) => clampText(s, 120)),
   kind: z.enum(SECTION_KINDS).catch("lines"),
   optional: z.boolean().default(false),
+  /** What the writer is told this section wants. Empty means the studio has not said. */
+  brief: z.string().default("").transform((s) => clampText(s, 1200)),
 });
 export type TemplateSection = z.infer<typeof TemplateSectionSchema>;
 
@@ -44,9 +47,20 @@ export const TemplateSchema = z.object({
   sections: z
     .array(z.unknown())
     .default([])
-    .transform((arr) =>
-      arr.map((s) => TemplateSectionSchema.safeParse(s)).filter((r) => r.success).map((r) => r.data),
-    ),
+    .transform((arr) => {
+      const seen = new Set<string>();
+      const out: TemplateSection[] = [];
+      for (const raw of arr) {
+        const parsed = TemplateSectionSchema.safeParse(raw);
+        if (!parsed.success || !parsed.data.key) continue;
+        // A key twice over is one section with two headings and one value. The
+        // second is dropped rather than silently overwriting the first.
+        if (seen.has(parsed.data.key)) continue;
+        seen.add(parsed.data.key);
+        out.push(parsed.data);
+      }
+      return out.slice(0, 40);
+    }),
   house_lines: z
     .object({
       fa: z.array(z.string()).default([]),
@@ -58,18 +72,32 @@ export const TemplateSchema = z.object({
 export type Template = z.infer<typeof TemplateSchema>;
 
 export function templateName(template: Template, lang: Lang): string {
-  const chosen = lang === "fa" ? template.name_fa || template.name : template.name || template.name_fa;
-  return chosen;
+  return lang === "fa" ? template.name_fa || template.name : template.name || template.name_fa;
 }
 
 /**
- * Which template fits this draft.
+ * The sections this template actually asks for.
  *
- * A template declaring the draft's own engagement wins; otherwise the default
- * one; otherwise the first there is. This is a suggestion, not a decision — the
- * page shows which it picked and lets the reader choose another, because a
- * suggestion presented as a fact is the kind of help nobody asked for.
+ * The one place the fallback lives, so the writer, the page, the exports and the
+ * pour cannot disagree about what a sectionless template means.
  */
+export function templateSections(template: Template | null | undefined): SectionDef[] {
+  const held = template?.sections ?? [];
+  if (held.length === 0) return DEFAULT_SECTIONS;
+  return held.map((s) => ({
+    key: s.key,
+    label_fa: s.label_fa,
+    label_en: s.label_en,
+    kind: s.kind,
+    optional: s.optional,
+    // A section the studio added without saying what it wants still needs a
+    // brief, or the writer is asked for a key with no instruction and fills it
+    // with whatever the heading suggests. The heading is the better guess.
+    brief: s.brief || `whatever the meeting supports under the heading «${s.label_fa || s.label_en}». If the meeting holds nothing for it, leave it empty.`,
+  }));
+}
+
+/** Which template fits this draft. A suggestion the page shows and the reader may override. */
 export function suggestTemplate(
   templates: readonly Template[],
   engagement: Engagement,
@@ -83,17 +111,10 @@ export function suggestTemplate(
   );
 }
 
-export type PouredSection = {
+export type PouredSection = SectionValue & {
   key: string;
   heading: string;
   kind: SectionKind;
-  /** For `text`. */
-  text: string;
-  /** For `lines`. */
-  lines: string[];
-  /** For `phases`. */
-  phases: { title: string; when: string; detail: string }[];
-  scheduleNote: string;
 };
 
 export type Poured = {
@@ -104,44 +125,27 @@ export type Poured = {
   houseLines: string[];
 };
 
-const EMPTY = { text: "", lines: [] as string[], phases: [] as PouredSection["phases"], scheduleNote: "" };
-
 /**
  * The draft poured into a template, in one language. Pure.
  *
- * An optional section with nothing in it is DROPPED; a required one with nothing
- * in it is kept, so the reader sees that the meeting left it empty rather than
- * wondering whether the section exists. That distinction is the only thing
- * `optional` means.
+ * An optional section with nothing in it is DROPPED; a required one with
+ * nothing in it is kept, so the reader sees that the meeting left it empty
+ * rather than wondering whether the section exists. That distinction is the
+ * only thing `optional` means.
  */
 export function pour(notes: MeetingNotes, template: Template, lang: Lang): Poured {
   const edition = notes[lang];
   const sections: PouredSection[] = [];
 
-  for (const section of template.sections) {
-    const heading = (lang === "fa" ? section.label_fa || section.label_en : section.label_en || section.label_fa).trim();
-    const base = { key: section.key, heading, kind: section.kind, ...EMPTY };
-
-    let filled: PouredSection = base;
-    if (section.key === "phases") {
-      filled = { ...base, phases: edition.phases, scheduleNote: edition.scheduleNote };
-    } else if (section.key === "openQuestions") {
-      filled = { ...base, lines: notes.openQuestions[lang] };
-    } else if (section.key === "summary") {
-      filled = { ...base, text: edition.summary };
-    } else if ((LIST_SECTIONS as readonly string[]).includes(section.key)) {
-      filled = { ...base, lines: edition[section.key as (typeof LIST_SECTIONS)[number]] };
-    }
-    // A key the draft does not have prints nothing rather than failing: a
-    // template outliving a schema change is the normal case.
-
-    const empty =
-      filled.text.trim().length === 0 &&
-      filled.lines.length === 0 &&
-      filled.phases.length === 0 &&
-      filled.scheduleNote.trim().length === 0;
-    if (empty && section.optional) continue;
-    sections.push(filled);
+  for (const section of templateSections(template)) {
+    const value = edition.sections[section.key] ?? EMPTY_SECTION;
+    if (isEmptySection(value) && section.optional) continue;
+    sections.push({
+      ...value,
+      key: section.key,
+      heading: sectionLabel(section, lang),
+      kind: section.kind,
+    });
   }
 
   return {
