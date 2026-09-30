@@ -5,6 +5,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import { Vazirmatn } from "next/font/google";
 
 import { routing, direction, type Locale } from "@/i18n/routing";
+import { THEME_SCRIPT } from "@/components/theme-switch";
 import "../globals.css";
 
 /**
@@ -58,7 +59,14 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
 
   return (
-    <html lang={locale} dir={direction[locale as Locale]} className={vazir.variable}>
+    <html lang={locale} dir={direction[locale as Locale]} className={vazir.variable} suppressHydrationWarning>
+      <head>
+        {/* Before the first paint, or the reader sees the wrong edition for a
+            frame on every navigation. It only ever ADDS the attribute — the
+            stylesheet already falls back to `prefers-color-scheme` when it is
+            absent, which is what "system" means. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh">
         <NextIntlClientProvider>{children}</NextIntlClientProvider>
       </body>

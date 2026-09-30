@@ -94,7 +94,7 @@ export default async function OneMeeting({
                 ? `${piece.idx + 1}: ${piece.error}`
                 : `${piece.idx + 1} · ${Math.round((piece.endMs - piece.startMs) / 1000)}s · ${piece.characters} chars`
             }
-            className="flex h-6 min-w-6 items-center justify-center rounded px-1 text-[10px] tnum"
+            className="flex h-6 min-w-6 items-center justify-center rounded px-1 text-[11px] tnum"
             style={{
               background:
                 piece.status === "done"

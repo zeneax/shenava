@@ -18,6 +18,12 @@ whose whole message is `[object Object]` because something rejected with a value
 that was not an `Error` — and which, once it could name itself, turned out to be
 a wallet extension injected into the page.
 
+**[`the-colours-are-measured.md`](the-colours-are-measured.md)** — "the
+application is too dark" has three different causes that feel identical, and the
+one that hides is a colour role which is readable on the ground and not on the
+panel behind it. Nothing in the build checks a pair of tokens. The note ends
+with the script that does, and the two surfaces nobody pictures.
+
 **[`a-shape-the-database-accepts.md`](a-shape-the-database-accepts.md)** — a
 `jsonb` column has no shape, so the database takes a dialogue the application
 will not read, and every reader degrades politely instead of complaining. The

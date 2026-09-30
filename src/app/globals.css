@@ -3,37 +3,68 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    Shenava — the design direction, in one file.
 
-   Two grounds and two signals. Neither ground is near-white or near-black:
-   the light ground sits around L* 88 and the dark around L* 17, which keeps
-   body text between 8:1 and 14:1 against it. That range is comfortable to
-   read for an hour, which is how long you spend on a transcript. Pure white
-   is not.
+   Two grounds and two signals. The warm signal (amber) belongs to audio —
+   waveforms, the pieces strip, anything in motion. The cool signal (teal)
+   belongs to text and structure — headings, the dialogue's two sides, links.
+   The product is the journey from one to the other, so the palette says it.
 
-   The warm signal (amber) belongs to audio — waveforms, the pieces strip,
-   anything in motion. The cool signal (teal) belongs to text and structure —
-   headings, the dialogue's two sides, links. The product is the journey from
-   one to the other, so the palette says it.
+   WHY THE LIGHT GROUND MOVED. It used to be #e2ded7, a beige at L* 89, chosen
+   so that nothing on screen was near-white. Read next to any other window it
+   looked dim rather than calm, and the theory had a hole in it: the ground was
+   the only thing that got the treatment. `--ink-faint` sat at 2.83:1 on it,
+   `--warm` at 3.12:1 and `--cool` at 4.34:1 — three of the five roles below the
+   4.5:1 that ordinary body text needs, and `--ink-faint` is what a hundred-odd
+   captions and chips in this application are written in.
+
+   The ground is a cream at L* 97 now and panels are white, so a panel lifts off
+   the page instead of dissolving into it. EVERY ROLE CLEARS 4.5:1 AGAINST EVERY
+   SURFACE IT CAN SIT ON — the ground, the raised panel and the sunken well,
+   which are three different backgrounds and the reason `--ink-faint` is darker
+   than it looks like it needs to be: it is set for the sunken surface, the
+   worst case, not for the ground. The dark edition is held to the same rule
+   from the other side, where the raised panel is the worst case instead.
+
+   Change a value here and re-run the check in `docs/the-colours-are-measured.md`
+   before believing it.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @theme {
-  --color-paper: #e2ded7;
-  --color-paper-raised: #edeae4;
-  --color-paper-sunken: #d6d1c8;
-  --color-ink: #21252a;
-  --color-ink-soft: #4e565f;
-  --color-ink-faint: #7b848e;
-  --color-line: #c5bfb4;
+  --color-paper: #faf6ee;
+  --color-paper-raised: #ffffff;
+  --color-paper-sunken: #f0eadd;
+  --color-ink: #20242a;
+  --color-ink-soft: #4a515b;
+  --color-ink-faint: #646a73;
+  --color-line: #e4dccb;
 
-  --color-warm: #b46a22;
-  --color-warm-soft: #d9a163;
-  --color-cool: #2f6f6b;
-  --color-cool-soft: #63a49f;
-  --color-good: #3f7a45;
-  --color-bad: #a33d2e;
+  --color-warm: #8b5010;
+  --color-warm-soft: #b8801f;
+  --color-cool: #1d6360;
+  --color-cool-soft: #3f8f8a;
+  --color-good: #2f6b37;
+  --color-bad: #9c3628;
 
   --font-sans: var(--font-vazir), ui-sans-serif, system-ui, sans-serif;
   --radius-panel: 0.875rem;
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* ── The type scale ──────────────────────────────────────────────────────
+     Persian letterforms need more size than Latin ones at the same nominal
+     pixel: the dots below «ب» and «ی» and the loop of «ه» all live in the
+     space a Latin face spends on nothing. This application was written in
+     Tailwind's defaults, which put 114 of its strings at 14px and 62 at 12px,
+     and 12px Persian is where the dots begin to touch.
+
+     Redefining the scale here moves every `text-sm` and `text-xs` in the
+     application at once, which is the only way a change like this stays
+     consistent — 200 edits across 40 files would not. The line heights go up
+     with them: Persian needs the leading more than Latin does. */
+  --text-xs: 0.8125rem;      /* 13px, was 12 */
+  --text-xs--line-height: 1.6;
+  --text-sm: 0.9375rem;      /* 15px, was 14 */
+  --text-sm--line-height: 1.75;
+  --text-base: 1.0625rem;    /* 17px, was 16 */
+  --text-base--line-height: 1.8;
 }
 
 :root {
@@ -52,29 +83,33 @@
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper: #23262a;
-    --paper-raised: #2c3035;
-    --paper-sunken: #1b1e21;
-    --ink: #ddd8d0;
-    --ink-soft: #a8a49c;
-    --ink-faint: #7d7a73;
-    --line: #3b4045;
-    --warm: #d9a163;
-    --cool: #7ab8b2;
+    --paper: #22252a;
+    --paper-raised: #2b2f35;
+    --paper-sunken: #1a1d21;
+    --ink: #e6e1d8;
+    --ink-soft: #b0aca4;
+    --ink-faint: #99958d;
+    --line: #3c4147;
+    --warm: #e0a866;
+    --cool: #7cbdb7;
+    --color-good: #7fba86;
+    --color-bad: #e08a79;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #23262a;
-  --paper-raised: #2c3035;
-  --paper-sunken: #1b1e21;
-  --ink: #ddd8d0;
-  --ink-soft: #a8a49c;
-  --ink-faint: #7d7a73;
-  --line: #3b4045;
-  --warm: #d9a163;
-  --cool: #7ab8b2;
+  --paper: #22252a;
+  --paper-raised: #2b2f35;
+  --paper-sunken: #1a1d21;
+  --ink: #e6e1d8;
+  --ink-soft: #b0aca4;
+  --ink-faint: #99958d;
+  --line: #3c4147;
+  --warm: #e0a866;
+  --cool: #7cbdb7;
+  --color-good: #7fba86;
+  --color-bad: #e08a79;
 }
 
 html { background: var(--paper); }
@@ -301,6 +336,46 @@ h1, h2, h3, h4 { font-weight: 500; letter-spacing: -0.01em; }
   .sentence:focus-visible .sentence-go { opacity: 1; }
   .sentence:hover .chip-arrow { transform: translateX(3px); }
   [dir="rtl"] .sentence:hover .chip-arrow { transform: scaleX(-1) translateX(3px); }
+}
+
+/* ── A turn, and the moment it changes sides ──────────────────────────────
+   Pressing "move to client" rewrites one word in a twelve-pixel label and
+   nothing else: the text does not move, the turn keeps its place in the list,
+   and after a second of waiting the only evidence is the caption you were not
+   looking at. It read as a dead button, and it was reported as one.
+
+   So the side is drawn down the whole edge of the turn — a bar in the
+   speaker's own colour, the same two colours used everywhere else on the page
+   — and the turn that just changed is lit for a moment so the eye is taken to
+   it. `--side` is the speaker's colour, set on the element.               */
+
+.turn {
+  --side: var(--ink-faint);
+  position: relative;
+  padding-inline-start: 0.875rem;
+  border-radius: 0 0.5rem 0.5rem 0;
+}
+
+.turn::before {
+  content: "";
+  position: absolute;
+  inset-block: 0.875rem;
+  inset-inline-start: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--side);
+  transition: background-color 0.35s var(--ease-out-soft);
+}
+
+/* Lit, then let go. The animation is put on by the turn that just moved and
+   taken off again a moment later, so a second move re-runs it. */
+@keyframes turn-lit {
+  from { background: color-mix(in oklab, var(--side) 26%, transparent); }
+  to   { background: transparent; }
+}
+.turn-lit { animation: turn-lit 1.6s var(--ease-out-soft); }
+@media (hover: hover) {
+  .turn-lit::before { box-shadow: 0 0 10px 1px color-mix(in oklab, var(--side) 55%, transparent); }
 }
 
 /* ── Right-to-left ─────────────────────────────────────────────────────────

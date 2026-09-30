@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { localeLabel, routing, type Locale } from "@/i18n/routing";
 import { Home } from "lucide-react";
 import { DoorRail } from "@/components/door-rail";
+import { ThemeSwitch } from "@/components/theme-switch";
 
 /**
  * The dashboard shell: one rail of doors, the page beside it. The rail itself
@@ -31,9 +32,12 @@ export default async function AppLayout({
           <Home className="h-4 w-4" />
           {brand("name")}
         </Link>
-        <Link href="/app" locale={other} className="text-sm hover:underline" style={{ color: "var(--ink-soft)" }}>
-          {localeLabel[other]}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/app" locale={other} className="text-sm hover:underline" style={{ color: "var(--ink-soft)" }}>
+            {localeLabel[other]}
+          </Link>
+          <ThemeSwitch />
+        </div>
       </header>
 
       <div className="gap-10 sm:flex sm:pt-8">

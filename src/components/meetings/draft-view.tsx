@@ -224,7 +224,7 @@ export function DraftView({
               <p className="text-sm" style={tone}>
                 <span style={{ color: muted ? "var(--ink-faint)" : "var(--ink)" }}>{p.title}</span>
                 {p.when && (
-                  <span className="ms-2 rounded-full px-2 py-0.5 text-[11px]" style={{ background: "var(--paper-sunken)", color: "var(--ink-soft)" }}>
+                  <span className="ms-2 rounded-full px-2 py-0.5 text-[12px]" style={{ background: "var(--paper-sunken)", color: "var(--ink-soft)" }}>
                     {p.when}
                   </span>
                 )}
@@ -272,14 +272,14 @@ export function DraftView({
         </div>
 
         <div className="p-4">
-          <p className="text-[11px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>{t("nowReads")}</p>
+          <p className="text-[12px] uppercase tracking-wide" style={{ color: "var(--ink-faint)" }}>{t("nowReads")}</p>
           <div className="mt-2 opacity-70">
             <Value kind={def.kind} value={proposal.before[lang]} muted />
           </div>
         </div>
 
         <div className="p-4" style={{ borderTop: "1px solid var(--line)", background: "var(--paper-raised)" }}>
-          <p className="text-[11px] uppercase tracking-wide" style={{ color: "var(--cool)" }}>{t("wouldRead")}</p>
+          <p className="text-[12px] uppercase tracking-wide" style={{ color: "var(--cool)" }}>{t("wouldRead")}</p>
           <div
             className="mt-2 ps-3"
             style={{ borderInlineStart: "2px solid var(--cool)" }}
@@ -350,7 +350,7 @@ export function DraftView({
           <h3 className="text-sm">{sectionLabel(def, lang)}</h3>
 
           {def.optional && isEmptySection(edition.sections[def.key] ?? EMPTY_SECTION) && def.key !== TITLE_KEY && (
-            <span className="text-[11px]" style={{ color: "var(--ink-faint)" }}>{t("wontPrint")}</span>
+            <span className="text-[12px]" style={{ color: "var(--ink-faint)" }}>{t("wontPrint")}</span>
           )}
 
           <button
@@ -361,7 +361,7 @@ export function DraftView({
               setDrafted(asText(def.kind, value));
               setEditing(def.key);
             }}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] disabled:opacity-40"
             style={chip}
           >
             <Pencil className="h-3 w-3" />
@@ -372,7 +372,7 @@ export function DraftView({
             type="button"
             disabled={busy !== null || reviewing}
             onClick={() => setAsking(asking === def.key ? null : def.key)}
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[12px] disabled:opacity-40"
             style={chip}
           >
             {working ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
@@ -389,7 +389,7 @@ export function DraftView({
               className="w-full rounded-lg p-3 text-sm leading-relaxed"
               style={{ background: "var(--paper-sunken)", border: "1px solid var(--line)", color: "var(--ink)" }}
             />
-            <p className="mt-1.5 text-[11px]" style={{ color: "var(--ink-faint)" }}>
+            <p className="mt-1.5 text-[12px]" style={{ color: "var(--ink-faint)" }}>
               {def.kind === "phases" ? t("phaseLine") : def.kind === "text" ? t("prose") : t("oneLine")}
             </p>
             <button

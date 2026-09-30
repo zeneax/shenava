@@ -126,7 +126,8 @@
       "long": {
         "title": "Long pieces (faster, and for long consultations)",
         "body": "9 minutes each, compressed in your browser to Opus. Six or seven requests for an hour of audio, and four or five minutes of waiting. Right for a real meeting.",
-        "unavailable": "This browser has no Opus encoder, so it cannot compress the pieces. Safari is the usual case — Chrome or Firefox can."
+        "unavailable": "This browser has no Opus encoder, so it cannot compress the pieces. Safari is the usual case — Chrome or Firefox can.",
+        "insecure": "This address is not secure (http over the network), and the browser only hands out its Opus encoder on a secure page — https, or localhost. The same browser can on localhost; being Chrome is not enough."
       }
     },
     "file": "The recording",
@@ -349,5 +350,11 @@
       "no-database": "The database is not connected. Open Connections.",
       "write-failed": "The database refused the write."
     }
+  },
+  "theme": {
+    "label": "Page brightness",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "Follow the system"
   }
 }

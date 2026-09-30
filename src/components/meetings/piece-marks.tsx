@@ -20,7 +20,7 @@ export function PieceMarks({ marks }: { marks: Mark[] }) {
         <span
           key={mark.idx}
           title={mark.note ?? String(mark.idx + 1)}
-          className="flex h-6 w-6 items-center justify-center rounded text-[10px] tnum"
+          className="flex h-6 w-6 items-center justify-center rounded text-[11px] tnum"
           style={{
             background:
               mark.state === "done"
