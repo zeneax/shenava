@@ -12,8 +12,14 @@ English at once.
 `docs/the-journey-of-a-file.md` — one recording from chosen to drafted, with
 every number and the reason for it. **Read this before touching
 `src/lib/meetings/`.**
+`docs/` holds four more notes, each about a failure the repository could not
+have warned you about. `docs/README.md` says which is which. Two are worth
+knowing before you start: `the-colours-are-measured.md`, because nothing in the
+build checks whether two of your tokens can be seen together, and
+`a-shape-the-database-accepts.md`, because a `jsonb` column has no shape and
+will take a value no reader here will accept.
 
-## Four rules that are not negotiable
+## Five rules that are not negotiable
 
 **The kernel owns the tuned numbers.** `@mazarix/voice-kernel` (MIT, on npm)
 holds the recording cap, the sample rate, the WAV header, the transcription
@@ -35,6 +41,15 @@ that transcribes it and forgets it. The text is kept; the recording is not.
 deadline that the meeting did not contain. A number that was said is kept
 exactly; a number that was not said becomes an open question. This is the one
 rule the product is judged on.
+
+**The section list is the template's, and the prohibition is not.** What a
+template names is what the writer is asked for, so a studio can add a clause,
+drop one, or reword what a clause asks for without a deploy — that is the point
+of `template.sections` and of each section's `brief`. `WRITER_RULES` in
+`proposal-guide.ts` is fixed and no template can reach it. A studio that could
+edit its own proposal template into permission to invent a price would have been
+handed the one thing this product exists to withhold, so the prohibition is
+composed into the prompt separately and a test asserts its wording.
 
 ## Both languages move together
 
@@ -77,6 +92,12 @@ Mark a module `server-only` when it holds a key, a database client, or a
 ```bash
 npm run typecheck && npm test
 ```
+
+If a colour token moved, run the check in `docs/the-colours-are-measured.md`.
+It reports the worst pairing in each edition, which is the only number that
+matters: a role is readable against a SURFACE, not in the abstract, and this
+design has three surfaces per edition. `tsc` does not read CSS and the tests do
+not render, so this is the only thing that will tell you.
 
 Then check the Persian pages at 320 pixels wide for horizontal scroll. Watch for
 absolutely positioned descendants of a horizontal scroller — a screen-reader-only

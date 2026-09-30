@@ -359,9 +359,16 @@ with half again the room rather than parsing a cut-off JSON. Two editions of a
 long meeting plus a fact list is more than a fixed 12,000-token ceiling, which
 is how that was found.
 
-Then `draft_status` is `pending`, and it stays pending. Every rewrite and every
-redraw returns it to pending. Approval is the only thing that moves it, and
-approval is a person pressing a button.
+Then `draft_status` is `pending`, and it stays pending. Every accepted rewrite
+and every redraw returns it to pending. Approval is the only thing that moves it
+forward, and approval is a person pressing a button.
+
+A rewrite of ONE section does not write at all until it is accepted. It costs
+about two cents against thirteen for a redraw, and it comes back as a proposal —
+the new lines beside the ones they would replace, with accept and discard. It
+used to save itself, which made asking for one a gamble: the lines you had were
+gone before you could read the new ones, and a rewrite that came back worse cost
+you the version you were happy with.
 
 ---
 

@@ -26,7 +26,7 @@ version of one will write something that looks right and fails on the first real
 recording.
 
 **[`AGENTS.fa.md`](AGENTS.fa.md)** — the rules an agent working *inside* the
-finished repository has to know, in Persian: the four that are not negotiable,
+finished repository has to know, in Persian: the five that are not negotiable,
 how the two languages move together, why a relative import in `src/lib` carries
 its `.ts` extension, what runs before a commit, and which bugs earn a note in
 `docs/`. The English edition is [`AGENTS.md`](../AGENTS.md) at the root of the

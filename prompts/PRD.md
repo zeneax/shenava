@@ -60,8 +60,10 @@ for *what we heard*, *goals*, *budget* and *exclusions*, and the consultant's
 lines for *phases*, *method* and *deliverables*.
 
 **Then it stops.** The draft is `pending` and stays pending. You edit a section
-by hand, ask for one section to be written again, redraw the whole thing with an
-instruction ("shorter; lead with the bot"), and when you are satisfied you
+by hand; you ask for one to be written again with an instruction, and what comes
+back is a PROPOSAL — shown against the lines it would replace, with accept and
+discard, and nothing written until you accept. You redraw the whole thing with
+an instruction ("shorter; lead with the bot"). When you are satisfied you
 approve it — which pours it into a proposal template and produces a numbered
 document. Every rewrite sets it back to pending. Nothing is ever sent anywhere
 on its own.
@@ -283,9 +285,21 @@ the samples are genuinely gone.
 a strip of pieces with their state while it transcribes; the transcript, and an
 editor for it; the dialogue, with either side alone, per-turn side buttons,
 sentence-level splitting, swap-both; the draft, section by section, each with
-*edit* and *write again*; a redraw box for an instruction; and at the bottom
+*edit* and *write again* — the second returning a proposal with the old lines
+beside the new ones, an instruction box under it, and accept or discard; a
+redraw box for an instruction; and at the bottom
 the **suggested template** with *pour the draft into this* — plus Word and
 print-sheet downloads of transcript, dialogue or notes.
+
+**The header, on every dashboard page** — the other language, and a
+light / dark / system switch. The switch is not decoration: the stylesheet has
+always carried both editions and nothing ever set `data-theme`, so before it
+existed `prefers-color-scheme` decided alone and a reader whose machine is in
+dark mode had no way to ask for the light one. The attribute is set by an inline
+script before the first paint; set from a component instead and the wrong
+edition shows for a frame on every navigation. "System" stores nothing, because
+an absent key and a stored "system" behave alike and would diverge the first
+time the default changed.
 
 **Settings** (`/app/settings`) — the studio's name and voice, the two seats,
 the ceilings, retention. Every field saved by one server action that returns
@@ -297,8 +311,17 @@ OpenRouter key, read from the environment and shown as *set* or *missing*
 answers green or red per line. Plus the schema file to paste, with a check for
 whether the tables exist yet.
 
-**Templates** (`/app/templates`) — the built-in template, and your own:
-sections, headings in both languages, and the house lines.
+**Templates** (`/app/templates`) — the built-in template and your own. A
+template's SECTIONS are editable here, and they are not a printing choice: what
+a template names is what the writer is asked to produce. Each section carries a
+key, a heading in both languages, what it holds (prose, a list, phases), whether
+an empty one is dropped, and a **brief** — the sentence the model is given for
+it. Add a clause here, redraw a meeting, and the clause is written. Plus the
+house lines, which the writer is told about so it never proposes them itself.
+
+A key is added or removed, never renamed: it is what a stored draft holds its
+lines under, and a key the template no longer names is dropped on read, so a
+rename would orphan every draft already written against it without a word.
 
 ---
 

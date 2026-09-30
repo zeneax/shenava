@@ -385,8 +385,16 @@ were made differently once and corrected.
 > tables exist yet. This page must repeat every check the setup script makes,
 > because it is where a person goes when something stops working later.
 >
-> **`/app/templates`** — the built-in template and your own: sections, headings
-> in both languages, house lines.
+> **`/app/templates`** — the built-in template and your own. A template's
+> SECTIONS are edited here and they are not a printing choice: what a template
+> names is what the writer is asked to produce. Each carries a key, a heading in
+> both languages, what it holds (`text` | `lines` | `phases`), whether an empty
+> one is dropped, and a **brief** — the one sentence the model is given for that
+> section. Adding a clause here and redrawing a meeting writes that clause.
+> Plus the house lines. A key is added or removed, never renamed: it is what a
+> stored draft holds its lines under, and a key the template no longer names is
+> dropped on read, so renaming orphans every draft silently. Derive the key from
+> the heading when a section is added and show it read-only after that.
 >
 > ### Keys, the setup script, and the door
 >
@@ -435,7 +443,31 @@ were made differently once and corrected.
 > Do not ship a template. Pick a real direction and hold it on every page: a
 > type scale, a small palette with tokens on `:root`, dark and light both
 > defined and both tested, generous spacing, and motion that is purposeful and
-> under 300 ms. Persian is the default language and right-to-left: test every
+> under 300 ms.
+>
+> **Check the palette as PAIRS, not as colours.** A role is only readable
+> against a particular surface, and a design like this has three per edition —
+> the ground, the raised panel, the sunken well. Every role must clear 4.5:1
+> against all three in both editions, and the worst pairing is the one that
+> decides a value. The two that catch people out invert between editions: in the
+> light one the worst surface is the SUNKEN well, darker than the ground; in the
+> dark one it is the RAISED panel, the lightest thing there. Nothing in a build
+> checks this — `tsc` does not read CSS and the tests do not render — so run the
+> script in `docs/the-colours-are-measured.md` whenever a token moves.
+>
+> **Give the reader a light / dark / system switch**, setting `data-theme` on
+> the root from an inline script before the first paint. A stylesheet with both
+> editions and no switch leaves the operating system deciding alone, and a
+> reader in dark mode with no way to ask for light reports it as "the
+> application is too dark" — which sounds like a palette problem and is not.
+>
+> **Size the type for Persian, not for Latin.** Persian spends on dots and loops
+> what a Latin face spends on nothing, so 12px Persian is smaller than 12px
+> English in every way that matters. Put the scale in the theme block so one
+> edit moves every string; a hundred edits across forty files will not stay
+> consistent.
+>
+> Persian is the default language and right-to-left: test every
 > page in Persian at **320 pixels wide** and fix any horizontal scroll. Watch
 > for absolutely positioned elements (a screen-reader-only label is
 > `position: absolute`) inside a horizontal scroller — they are laid out by an
@@ -493,12 +525,15 @@ were made differently once and corrected.
 > both languages, this instruction, and the walkthrough of one recording that is
 > read before touching the cutting code.
 >
-> **Write down the four non-negotiable rules.** The kernel owns the tuned
+> **Write down the five non-negotiable rules.** The kernel owns the tuned
 > numbers and no local copy is allowed. `planSegments` stays a pure function of
 > the samples — no clock, no randomness, nothing read off the device — because
 > resumption depends on the same file producing the same cuts, and breaking it
 > shows up as a transcript with a hole in it. The audio is never stored. The
-> draft never invents a figure.
+> draft never invents a figure. The section list belongs to the template — what
+> a template names is what the writer is asked for — and the prohibition against
+> inventing a figure does not: it is composed into the prompt separately, where
+> no template can reach it.
 >
 > **Say that both languages move together:** one key set across both
 > catalogues, Persian written as Persian rather than translated, and the

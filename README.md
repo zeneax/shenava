@@ -30,14 +30,20 @@ answer is only ever a wrong label. You can fix a label, split a turn sentence by
 sentence, or swap both sides — none of which calls a model.
 
 **Three — the draft.** A model reads the labelled dialogue and writes the
-proposal under twelve headings, in both languages at once, as finished sentences
+proposal under the headings its template names — twelve to begin with — in both
+languages at once, as finished sentences
 you could paste into a document. It is told never to invent a price, a date or a
 number: what the meeting left unsettled goes under *open questions*.
 
-**Then it stops.** The draft waits for you. Edit a section, ask for one section
-to be written again, redraw the whole thing with an instruction, and when you
-are satisfied, pour it into a proposal template and download it as Word or a
-print sheet.
+**Then it stops.** The draft waits for you. Edit a section by typing, or ask for
+one to be written again with an instruction — which comes back as a *proposal*
+shown against the lines it would replace, and writes nothing until you accept
+it. Redraw the whole thing if you would rather. When you are satisfied, pour it
+into a proposal template and download it as Word or a print sheet.
+
+**And the sections are yours.** What a template names is what the model is asked
+to write, so adding a clause on the Templates page and redrawing a meeting is
+the whole loop — no deploy, no code.
 
 ---
 
@@ -186,11 +192,13 @@ so and moves on. If they are not, it stops and asks you to make them:
    **whole** file, paste it in, press **Run**. It creates six tables, three
    functions and the security rules.
 3. **New query** again, and do the same with [`db/02_seed.sql`](db/02_seed.sql).
-   This one gives you the built-in proposal template and **one fully worked
-   sample meeting** — transcript, speaker-labelled dialogue and finished
-   proposal draft — so the app has something to show you before you have
-   recorded anything. The bookshop in it is invented; delete the meeting
-   whenever you like.
+   This one gives you the built-in proposal template and **three fully worked
+   sample meetings** — transcript, speaker-labelled dialogue and finished
+   proposal draft each — so the app has something to show you before you have
+   recorded anything. Three, because one meeting cannot show the range a draft
+   has to survive: a bookshop where no figure was ever said, a distributor where
+   both sides named figures and settled the weeks, and a law firm that settled
+   almost nothing. All three are invented; delete them whenever you like.
 
 Both files are safe to run twice, and you should see `Success. No rows
 returned` after each. **The order matters:** `01_schema.sql` first. Running the
@@ -254,10 +262,15 @@ npm run dev
 Open **[http://localhost:3100](http://localhost:3100)**. Port 3100 rather than
 3000, so it does not collide with whatever else you have running.
 
-Press **Dashboard**. You should see the sample meeting in the list. Open it and
-you can read its transcript, its dialogue with the two speakers told apart, and
-its proposal draft in either language — all without a single model call,
-because it came from the seed file.
+Press **Dashboard**. You should see the three sample meetings in the list. Open
+one and you can read its transcript, its dialogue with the two speakers told
+apart, and its proposal draft in either language — all without a single model
+call, because it came from the seed file.
+
+In the header there is a switch for the other language and one for light, dark
+or whatever your machine says. It starts on your machine's setting and remembers
+a choice, so a reader whose laptop is in dark mode is not stuck with a dark
+Shenava.
 
 **If something is wrong**, open **Connections** in the left rail. It repeats
 every check the setup script made and answers line by line: which variables are
