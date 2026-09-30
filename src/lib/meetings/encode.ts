@@ -45,16 +45,35 @@ function configFor(sampleRate: number): OpusConfig {
   return { codec: "opus", sampleRate, numberOfChannels: 1, bitrate: LONG_PIECE_BITRATE };
 }
 
-/** Whether this browser can encode Opus at the kernel's rate. False on the server. */
-export async function canEncodeOpus(sampleRate: number): Promise<boolean> {
+/**
+ * Why this browser cannot encode Opus, or that it can.
+ *
+ * Two different absences look identical from `typeof AudioEncoder`. Safari
+ * has no Opus encoder at all. Chrome has one and withholds it on a page that
+ * is not a secure context — plain `http://` on anything but `localhost`, which
+ * is exactly what the dev server's Network address is. The note that blamed
+ * Safari was shown in Chrome on a phone, and sent the reader to the wrong
+ * browser. `isSecureContext` is undefined on the server, so that case reads as
+ * no encoder, as before.
+ */
+export type OpusVerdict = "ready" | "insecure" | "no-encoder";
+
+export async function opusVerdict(sampleRate: number): Promise<OpusVerdict> {
   const w = globalThis as EncoderWindow;
-  if (!w.AudioEncoder || !w.AudioData) return false;
+  if (!w.AudioEncoder || !w.AudioData) {
+    return globalThis.isSecureContext === false ? "insecure" : "no-encoder";
+  }
   try {
     const { supported } = await w.AudioEncoder.isConfigSupported(configFor(sampleRate));
-    return Boolean(supported);
+    return supported ? "ready" : "no-encoder";
   } catch {
-    return false;
+    return "no-encoder";
   }
+}
+
+/** Whether this browser can encode Opus at the kernel's rate. False on the server. */
+export async function canEncodeOpus(sampleRate: number): Promise<boolean> {
+  return (await opusVerdict(sampleRate)) === "ready";
 }
 
 /** The samples as an Ogg Opus stream. Throws when the browser cannot encode. */

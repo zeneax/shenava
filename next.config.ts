@@ -20,6 +20,21 @@ const nextConfig: NextConfig = {
    * Development only — `next build` ignores it.
    */
   logging: { browserToTerminal: "error" },
+  /**
+   * Opening the dev server from a phone on the same Wi-Fi.
+   *
+   * `next dev` prints a Network address and then refuses to serve its own
+   * scripts to it: cross-origin requests for dev assets are blocked unless the
+   * hostname is listed here. The page still arrives — it is plain HTML — but
+   * React never hydrates on that device, so every button on the site is dead
+   * and the only word about it is one line in this terminal. See
+   * docs/silent-css-and-dead-clicks.md.
+   *
+   * A `*` is exactly one label, so these are the two private ranges as four
+   * labels each, and no address has to be edited in when the router hands out
+   * a new one. Development only — `next build` ignores it.
+   */
+  allowedDevOrigins: ["192.168.*.*", "10.*.*.*"],
 };
 
 export default withNextIntl(nextConfig);

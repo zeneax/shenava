@@ -14,7 +14,7 @@ import {
   type PieceMode,
   type Segment,
 } from "@/lib/meetings/segments";
-import { canEncodeOpus } from "@/lib/meetings/encode";
+import { opusVerdict, type OpusVerdict } from "@/lib/meetings/encode";
 import { downsample, toMono } from "@/lib/meetings/wav-encode";
 import { createMeeting } from "@/lib/actions/meetings";
 import { sendPieces } from "@/lib/meetings/send";
@@ -60,7 +60,7 @@ export function NewMeetingForm() {
   const [clientName, setClientName] = useState("");
   const [language, setLanguage] = useState<"farsi" | "english" | "auto">("auto");
   const [mode, setMode] = useState<PieceMode>("long");
-  const [opusReady, setOpusReady] = useState<boolean | null>(null);
+  const [opus, setOpus] = useState<OpusVerdict | null>(null);
 
   const samples = useRef<{ data: Float32Array; rate: number } | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -96,16 +96,16 @@ export function NewMeetingForm() {
    */
   useEffect(() => {
     let alive = true;
-    void canEncodeOpus(timing.audio.sampleRate)
-      .then((ok) => {
+    void opusVerdict(timing.audio.sampleRate)
+      .then((verdict) => {
         if (!alive) return;
-        setOpusReady(ok);
-        if (!ok) setMode("minute");
+        setOpus(verdict);
+        if (verdict !== "ready") setMode("minute");
       })
       // A browser that cannot answer the question has no encoder to offer.
       .catch(() => {
         if (!alive) return;
-        setOpusReady(false);
+        setOpus("no-encoder");
         setMode("minute");
       });
     return () => {
@@ -325,7 +325,7 @@ export function NewMeetingForm() {
         </p>
         <div className="mt-1 grid gap-3 sm:grid-cols-2">
           {(["long", "minute"] as const).map((value) => {
-            const blocked = busy || (value === "long" && opusReady === false);
+            const blocked = busy || (value === "long" && opus !== null && opus !== "ready");
             const chosen = mode === value;
             return (
               <button
@@ -344,9 +344,9 @@ export function NewMeetingForm() {
                 <span className="mt-1.5 block text-xs leading-relaxed" style={{ color: "var(--ink-soft)" }}>
                   {t(`mode.${value}.body`)}
                 </span>
-                {value === "long" && opusReady === false && (
+                {value === "long" && opus !== null && opus !== "ready" && (
                   <span className="mt-2 block text-xs leading-relaxed" style={{ color: "var(--warm)" }}>
-                    {t("mode.long.unavailable")}
+                    {t(opus === "insecure" ? "mode.long.insecure" : "mode.long.unavailable")}
                   </span>
                 )}
               </button>

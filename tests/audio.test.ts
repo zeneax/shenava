@@ -154,3 +154,43 @@ test("a stream with too few pages is refused rather than cut to nothing", () => 
   assert.equal(halveOgg(muxOpusOgg(opusPackets(2), { channels: 1, inputRate: RATE })), null);
   assert.equal(halveOgg(new Uint8Array([1, 2, 3])), null);
 });
+
+/* ── The fingerprint, with and without a platform ───────────────────────── */
+
+import { sha256Hex, sha256HexPure } from "../src/lib/meetings/segments.ts";
+import { webcrypto, randomBytes } from "node:crypto";
+
+// `getRandomValues` refuses more than 65,536 bytes; `randomBytes` has no such cap.
+const random = (size: number): ArrayBuffer => new Uint8Array(randomBytes(size)).buffer as ArrayBuffer;
+
+const utf8 = (s: string) => new TextEncoder().encode(s).buffer as ArrayBuffer;
+
+test("the pure SHA-256 matches the published test vectors", () => {
+  assert.equal(sha256HexPure(utf8("")), "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  assert.equal(sha256HexPure(utf8("abc")), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+});
+
+test("the pure SHA-256 is byte-for-byte WebCrypto's, across every padding boundary", async () => {
+  // 55, 56 and 64 are where the length field does and does not fit the first
+  // block; 65 and the large one force several blocks. A wrong carry or a
+  // padding off-by-one shows up in exactly one of these and in no reading.
+  for (const size of [1, 55, 56, 63, 64, 65, 1000, 70_001]) {
+    const bytes = random(size);
+    const platform = Array.from(new Uint8Array(await webcrypto.subtle.digest("SHA-256", bytes)))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+    assert.equal(sha256HexPure(bytes), platform, `size ${size}`);
+  }
+});
+
+test("sha256Hex without crypto.subtle — a phone over plain http — gives the same fingerprint", async () => {
+  const bytes = random(4096);
+  const withPlatform = await sha256Hex(bytes);
+  const saved = globalThis.crypto;
+  try {
+    Object.defineProperty(globalThis, "crypto", { value: undefined, configurable: true });
+    assert.equal(await sha256Hex(bytes), withPlatform);
+  } finally {
+    Object.defineProperty(globalThis, "crypto", { value: saved, configurable: true });
+  }
+});

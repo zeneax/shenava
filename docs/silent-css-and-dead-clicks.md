@@ -265,3 +265,144 @@ Two standing arrangements back it up. `next.config.ts` sets
 `'' + object` — is printed in the `npm run dev` terminal; the setting is read at
 startup, so changing it needs the dev server restarted. And the component above
 means the overlay carries it too, for anyone who never looks at the terminal.
+
+---
+
+## Every button is dead — but only on the phone
+
+**Symptom.** `npm run dev` prints a Network address. Open it from another
+device on the same Wi-Fi and the page arrives complete: the dashboard, the
+transcript, the dialogue with all its chips. Press anything and nothing
+happens. Not one action on the whole site. On the laptop that runs the server,
+the same page works.
+
+**What it was.** Next.js blocks cross-origin requests for its dev-only assets
+and endpoints — `/_next/*` scripts, HMR — from any hostname other than
+`localhost` and the one it was started with. The HTML is served, because the
+HTML is not a dev asset. The scripts that would hydrate it are refused. So the
+device gets a page that looks finished and has no React in it, which is
+indistinguishable from a page whose buttons do nothing.
+
+The one word about it is a line in the server's own terminal, on the machine
+you are not looking at:
+
+```
+⚠ Blocked cross-origin request to Next.js dev resource /_next/hmr from "192.168.100.13".
+```
+
+The fix is `allowedDevOrigins` in `next.config.ts`. It matches hostnames, and a
+`*` is exactly one label, so `192.168.*.*` is the whole private range as four
+labels. The dev server has to be restarted for it to take.
+
+**The command.** Whether the running server is refusing anyone:
+
+```bash
+grep -c "Blocked cross-origin" <the dev server's output>
+```
+
+And whether the config covers the address you are about to type into the
+phone — the hostname must fit one of these patterns:
+
+```bash
+grep -A1 allowedDevOrigins next.config.ts
+```
+
+Related, and not an error: the phone's browser marks the address **Not Secure**.
+It is plain HTTP on a private network, which is what a dev server is. Nothing
+to fix for local use.
+
+**But the same address is not a secure context**, and that one does reach the
+code. A browser withholds a whole family of APIs from plain `http://` on
+anything other than `localhost`: `crypto.subtle`, `crypto.randomUUID`,
+WebCodecs' `AudioEncoder`, `getUserMedia`. On the laptop every one of them is
+there; on the phone every one of them is `undefined`, and nothing says so.
+
+Two symptoms of it, seen on the same afternoon:
+
+- The dev overlay shows `crypto.randomUUID is not a function` with a call stack
+  entirely inside `chrome-extension://…/inject.js`. That is a browser extension
+  tripping over the missing API, not this application; the overlay reports any
+  error on the page. Esc dismisses it, or open the site in a window where the
+  extension is off.
+- Choosing a recording failed as "could not read the file". The file was fine.
+  `sha256Hex` called `crypto.subtle.digest` and threw, and the form's `catch`
+  reported it as an unreadable file. It now falls back to a pure SHA-256 when
+  `crypto.subtle` is absent, held to WebCrypto's output by a test.
+- The long cutting mode was greyed out in Chrome, with a note blaming Safari.
+  It needs `AudioEncoder`, which the same Chrome has on `localhost` and not on
+  `http://192.168.…`. The note was written when Safari was the only known
+  cause; `canEncodeOpus` now tells the two apart and the form says which.
+
+**The command.** Every secure-context-only API this code reaches for, so a new
+one is caught before a phone does:
+
+```bash
+grep -rnE "crypto\.subtle|randomUUID|AudioEncoder|getUserMedia" src --include="*.ts" --include="*.tsx"
+```
+
+Each hit must either guard on the API's absence or be reached only from a
+server module.
+
+---
+
+## The Persian Word file says the meeting was 110 minutes
+
+**Symptom.** Download the Persian edition of any document. The line under the
+title reads «کلاینت: پخش مواد غذایی رها ۸۰ مهر ۱۴۰۵ ۱۱۰ دقیقه ۰ استودیوی شما»:
+the eightieth of Mehr, a hundred and ten minutes, and a stray zero before the
+studio's name. The meeting was eleven minutes long, on the eighth. The English
+edition of the same meeting is right. Word and Quick Look agree, so it is not a
+renderer.
+
+**What it was.** The pieces of that line were joined with a middle dot, `·`
+U+00B7, in both languages. The Persian digit zero, «۰», is a small circle.
+So is a middle dot. Beside a Persian numeral the separator *is* a digit —
+«۸ · ۱۱» is «۸۰ ۱۱» — and there is nothing to grep for, because the text is
+correct; only the glyph is wrong. `metaJoin` in `lib/meetings/format.ts` now
+joins Persian with the Persian comma «،», which is what Persian uses for a
+list and is not a digit, and English with the dot as before.
+
+**The command.** A middle dot anywhere it could sit next to a Persian numeral:
+
+```bash
+grep -rn '·' src/lib/meetings/ messages/fa.json
+```
+
+Running it today finds three in `messages/fa.json` and they are fine, for a
+reason worth stating so nobody "fixes" them: the pages keep Latin figures in
+Persian prose on purpose (see `.tnum` in `globals.css`), and a dot beside a
+Latin `4` looks nothing like a zero. The hazard is a dot beside a *Persian*
+digit, «۴», and only the documents produce those — `meetingDate` and
+`durationLabel` format with `fa-IR`. So the rule is: no middle dot on any
+string that reaches a document in Persian, and `metaJoin` is the only place
+those strings are joined.
+
+---
+
+## The Persian Word file is flush left — in Word, and only in Word
+
+**Symptom.** Open the Persian edition in Word: the title, the metadata line
+and every paragraph sit against the left margin, reading right-to-left from
+the wrong side of the page. Quick Look on the same file shows everything
+against the right margin, so the file "looks fine" to anyone previewing it.
+
+**What it was.** Every Persian paragraph was `<w:bidi/>` with
+`<w:jc w:val="right"/>`. In a bidi paragraph Word reads `left` and `right` as
+*logical* — `right` is the end of the line, which for right-to-left is the
+left edge. Apple's importer reads the same value physically. The XML was the
+same in both; the readers disagree, and Word is the one the client opens.
+
+Measured in Word 16.112, one paragraph per value, all `w:bidi`:
+`right` → left edge · `left` → right edge · `start` → right edge ·
+`end` → left edge · none → right edge. `docx.ts` now aligns Persian to
+`START`, which is the logical value the spec means and the one Word honours.
+
+**The command.** A `right` on any bidi paragraph in a file this code built —
+build one and look, since the value is correct XML and no lint sees it:
+
+```bash
+node --test tests/documents.test.ts 2>&1 | grep -E "START|flush"
+```
+
+And the general lesson: for a Word file, Quick Look is not a preview. It is a
+different implementation. Check Word.

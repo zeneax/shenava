@@ -47,6 +47,12 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
   const [pending, setPending] = useState<string | null>(null);
   const waiting = (key: string) => busy && pending === key;
 
+  /* The turn that just changed sides, lit for a moment. A move rewrites one
+     word in a caption and moves nothing, so without this the answer to a
+     second of waiting is a label you were not looking at — which is what a
+     dead button looks like. Cleared on a timer so a second move re-runs it. */
+  const [lit, setLit] = useState<number | null>(null);
+
   const share = dialogueShare(dialogue);
   const total = share.consultant + share.client + share.unknown || 1;
 
@@ -56,6 +62,8 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
       await setSide({ id, turnIndex, sentenceIndex, who });
       setOpenTurn(null);
       setPending(null);
+      setLit(turnIndex);
+      window.setTimeout(() => setLit((at) => (at === turnIndex ? null : at)), 1600);
       router.refresh();
     });
   };
@@ -148,8 +156,8 @@ export function DialogueView({ id, dialogue }: { id: string; dialogue: Dialogue 
           return (
             <div
               key={turnIndex}
-              className="border-t py-4"
-              style={{ borderColor: "var(--line)" }}
+              className={`turn border-t py-4${lit === turnIndex ? " turn-lit" : ""}`}
+              style={{ borderColor: "var(--line)", "--side": colourOf(turn.who) } as CSSProperties}
             >
               <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                 <span
