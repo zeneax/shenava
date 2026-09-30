@@ -12,6 +12,14 @@ export function RunDraft({ id, hasDialogue }: { id: string; hasDialogue: boolean
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
+  // A known refusal gets its sentence, and the provider's own words follow it,
+  // because "transport" alone cannot tell a 429 from a revoked key.
+  const refusalLine = (body: { reason?: string; detail?: string }, status: number) => {
+    const reason = body.reason ?? `HTTP ${status}`;
+    const said = t.has(`reason.${reason}`) ? t(`reason.${reason}`) : reason;
+    return body.detail ? `${said} — ${body.detail}` : said;
+  };
+
   const run = async () => {
     setBusy(true);
     setProblem(null);
@@ -23,7 +31,7 @@ export function RunDraft({ id, hasDialogue }: { id: string; hasDialogue: boolean
       });
       const body = (await response.json().catch(() => ({}))) as { ok?: boolean; reason?: string; detail?: string };
       if (response.ok && body.ok) router.refresh();
-      else setProblem(body.detail ? `${body.reason}: ${body.detail}` : (body.reason ?? `HTTP ${response.status}`));
+      else setProblem(refusalLine(body, response.status));
     } catch (error) {
       setProblem(String(error));
     } finally {

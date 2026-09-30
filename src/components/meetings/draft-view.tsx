@@ -82,6 +82,14 @@ export function DraftView({
       ? edition.title
       : writeSectionValue(def.kind, edition.sections[def.key] ?? EMPTY_SECTION);
 
+  // A known refusal gets its sentence, and the provider's own words follow it,
+  // because "transport" alone cannot tell a 429 from a revoked key.
+  const refusalLine = (body: { reason?: string; detail?: string }, status: number) => {
+    const reason = body.reason ?? `HTTP ${status}`;
+    const said = t.has(`reason.${reason}`) ? t(`reason.${reason}`) : reason;
+    return body.detail ? `${said} — ${body.detail}` : said;
+  };
+
   const ask = async (key: string, note: string) => {
     setProblem(null);
     setBusy({ what: "section", which: key });
@@ -99,7 +107,7 @@ export function DraftView({
         setAsking(null);
         setEditing(null);
       } else {
-        setProblem(answer.detail ? `${answer.reason}: ${answer.detail}` : (answer.reason ?? `HTTP ${response.status}`));
+        setProblem(refusalLine(answer, response.status));
       }
     } catch (error) {
       setProblem(String(error));
@@ -123,7 +131,7 @@ export function DraftView({
         setProposal(null);
         router.refresh();
       } else {
-        setProblem(answer.detail ? `${answer.reason}: ${answer.detail}` : (answer.reason ?? `HTTP ${response.status}`));
+        setProblem(refusalLine(answer, response.status));
       }
     } catch (error) {
       setProblem(String(error));

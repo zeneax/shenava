@@ -11,6 +11,7 @@ import { sectionGuide } from "./proposal-guide.ts";
 import { materialBlock } from "./notes.ts";
 import { readSectionsFor } from "./templates-read.ts";
 import { ask, ceilingFor, loadMaterial, openSeat, record, retryNote, type Refusal } from "./seat.ts";
+import { nextStep, pause } from "./retry.ts";
 
 /**
  * One section, written again — in both editions, with the rest of the draft as
@@ -133,21 +134,29 @@ Return JSON only, in exactly this shape:
   const { seat } = opened;
 
   const totals = { tokensIn: 0, tokensOut: 0, costUsd: 0, ms: 0 };
+  const attempts = 2;
   let problem = "";
+  // True while the last attempt failed before the model answered — see notes.ts.
+  let transport = false;
   let after: Record<NotesLang, unknown> | null = null;
 
   const AnswerSchema = z.object({ fa: z.unknown(), en: z.unknown() });
 
-  for (let attempt = 1; attempt <= 2 && after === null; attempt += 1) {
+  for (let attempt = 1; attempt <= attempts && after === null; attempt += 1) {
     const answer = await ask(
       seat,
-      attempt === 1 ? prompt : prompt + retryNote(problem),
+      problem && !transport ? prompt + retryNote(problem) : prompt,
       ceilingFor(prompt.length / 4, 4000),
     );
     if ("failed" in answer) {
       problem = answer.reason;
+      transport = true;
+      const step = nextStep(answer, attempt, attempts);
+      if (!step.retry) break;
+      await pause(step.waitMs);
       continue;
     }
+    transport = false;
     totals.tokensIn += answer.tokensIn;
     totals.tokensOut += answer.tokensOut;
     totals.costUsd += answer.costUsd;
@@ -167,7 +176,7 @@ Return JSON only, in exactly this shape:
   }
 
   await record(meetingId, "section", settings.writerModel, totals, after !== null, key, after === null ? problem : undefined);
-  if (after === null) return { ok: false, reason: "unreadable", detail: problem };
+  if (after === null) return { ok: false, reason: transport ? "transport" : "unreadable", detail: problem };
 
   // Nothing is written. The reviewer compares and decides; `applySection` saves.
   return { ok: true, proposal: { key, before, after }, costUsd: totals.costUsd };

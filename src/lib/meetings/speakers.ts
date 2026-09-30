@@ -8,6 +8,7 @@ import {
 } from "./dialogue-schema.ts";
 import { ask, loadMaterial, openSeat, record, retryNote, MATERIAL_GUARD, type Refusal } from "./seat.ts";
 import { spansCeilingFor } from "./ceiling.ts";
+import { nextStep, pause } from "./retry.ts";
 import { getSettings } from "@/lib/settings";
 
 /**
@@ -142,6 +143,9 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
     });
 
     let problem = "";
+    // True while the last attempt failed before the model answered — see the
+    // same flag in notes.ts for why the two are told apart.
+    let transport = false;
     let parsed: ReturnType<typeof SpansAnswerSchema.safeParse> | null = null;
 
     // Sized to the chunk, and not a constant — see `spansCeilingFor` for the
@@ -149,13 +153,20 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
     let ceiling = spansCeilingFor(chunk.to - chunk.from + 1, settings.writerMaxOutputTokens);
 
     // Two attempts. The second carries the first one's verdict, because "answer
-    // again" without saying what was wrong usually produces the same answer.
-    for (let attempt = 1; attempt <= 2 && !parsed?.success; attempt += 1) {
-      const answer = await ask(seat, attempt === 1 ? prompt : prompt + retryNote(problem), ceiling);
+    // again" without saying what was wrong usually produces the same answer —
+    // and carries nothing after a refusal, which left no answer to judge.
+    const attempts = 2;
+    for (let attempt = 1; attempt <= attempts && !parsed?.success; attempt += 1) {
+      const answer = await ask(seat, problem && !transport ? prompt + retryNote(problem) : prompt, ceiling);
       if ("failed" in answer) {
         problem = answer.reason;
+        transport = true;
+        const step = nextStep(answer, attempt, attempts);
+        if (!step.retry) break;
+        await pause(step.waitMs);
         continue;
       }
+      transport = false;
       totals.tokensIn += answer.tokensIn;
       totals.tokensOut += answer.tokensOut;
       totals.costUsd += answer.costUsd;
@@ -183,7 +194,7 @@ export async function labelSpeakers(meetingId: string): Promise<SpeakersResult> 
     }
 
     if (!parsed?.success) {
-      failure = problem.length > 0 ? "unreadable" : "transport";
+      failure = transport ? "transport" : "unreadable";
       why = problem;
       break;
     }

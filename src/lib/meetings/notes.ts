@@ -8,6 +8,7 @@ import { notesShape, parseNotes, type MeetingNotes, type SectionDef } from "./no
 import { sectionGuide } from "./proposal-guide.ts";
 import { readSectionsFor } from "./templates-read.ts";
 import { ask, ceilingFor, loadMaterial, openSeat, record, retryNote, MATERIAL_GUARD, type Material, type Refusal } from "./seat.ts";
+import { nextStep, pause } from "./retry.ts";
 
 /**
  * The draft: the meeting in, the proposal's own sentences out, both languages
@@ -132,7 +133,13 @@ export async function draftNotes(
   ].join("\n");
 
   const totals = { tokensIn: 0, tokensOut: 0, costUsd: 0, ms: 0 };
+  const attempts = 2;
   let problem = "";
+  // True while the last attempt failed before the model said anything — a
+  // status or a dropped connection, not an answer. The two want opposite
+  // fixes, and were reported under one word until a 429 sent a reader off to
+  // change the writer model.
+  let transport = false;
   // Sized to the material, not fixed: two editions of a long meeting plus a
   // fact list is more than any constant, and a draft cut off at the ceiling
   // parses as "unreadable" — which sends you looking at the model rather than
@@ -140,12 +147,20 @@ export async function draftNotes(
   let ceiling = ceilingFor(prompt.length, settings.writerMaxOutputTokens);
   let notes: MeetingNotes | null = null;
 
-  for (let attempt = 1; attempt <= 2 && notes === null; attempt += 1) {
-    const answer = await ask(seat, attempt === 1 ? prompt : prompt + retryNote(problem), ceiling);
+  for (let attempt = 1; attempt <= attempts && notes === null; attempt += 1) {
+    // The verdict goes back to the model only when there was an answer to
+    // pass a verdict on. After a refusal there was none, and the refusal's
+    // body is not something to ask the model to correct.
+    const answer = await ask(seat, problem && !transport ? prompt + retryNote(problem) : prompt, ceiling);
     if ("failed" in answer) {
       problem = answer.reason;
+      transport = true;
+      const step = nextStep(answer, attempt, attempts);
+      if (!step.retry) break;
+      await pause(step.waitMs);
       continue;
     }
+    transport = false;
     totals.tokensIn += answer.tokensIn;
     totals.tokensOut += answer.tokensOut;
     totals.costUsd += answer.costUsd;
@@ -181,7 +196,7 @@ export async function draftNotes(
     notes === null ? problem : undefined,
   );
 
-  if (notes === null) return { ok: false, reason: "unreadable", detail: problem };
+  if (notes === null) return { ok: false, reason: transport ? "transport" : "unreadable", detail: problem };
 
   const supabase = db();
   if (supabase) {

@@ -1,5 +1,6 @@
 import "server-only";
 import { openRouterKey, openRouterApp } from "@/lib/env";
+import { readProviderError, retryAfterSeconds } from "./provider-error.ts";
 
 /**
  * One way to reach a model, and one place that knows how.
@@ -11,7 +12,10 @@ import { openRouterKey, openRouterApp } from "@/lib/env";
  *
  * Nothing here retries. Retry policy belongs to the caller, because what counts
  * as worth retrying differs between transcribing a minute of speech and asking
- * for a JSON draft, and the kernel has the answer for the first one.
+ * for a JSON draft — and which statuses are worth it is the kernel's list,
+ * obeyed by `transcribe.ts` for the first and `meetings/retry.ts` for the
+ * second. A failure therefore carries everything a caller needs to decide:
+ * the status, the provider's own sentence, and how long it asked us to wait.
  */
 const BASE = "https://openrouter.ai/api/v1";
 
@@ -48,7 +52,10 @@ export type Failure = {
   ok: false;
   /** The HTTP status, or 0 for a transport failure or a timeout. */
   status: number;
+  /** The provider's own sentence where its body carried one; the body otherwise. */
   message: string;
+  /** How long the provider asked us to wait before asking again, when it said. */
+  retryAfterSeconds?: number;
   ms: number;
 };
 
@@ -84,7 +91,16 @@ export async function ask(options: AskOptions): Promise<Answer | Failure> {
     const ms = Date.now() - started;
     if (!response.ok) {
       const body = await response.text().catch(() => "");
-      return { ok: false, status: response.status, message: body.slice(0, 500) || response.statusText, ms };
+      const said = readProviderError(body);
+      return {
+        ok: false,
+        status: response.status,
+        message: said.message || response.statusText,
+        // The header is the word. OpenRouter also echoes it inside the body,
+        // which is read when the header is missing.
+        retryAfterSeconds: retryAfterSeconds(response.headers.get("retry-after")) ?? said.retryAfterSeconds,
+        ms,
+      };
     }
 
     const body = (await response.json()) as {

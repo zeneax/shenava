@@ -227,7 +227,19 @@
     "againHint": "What should it change?",
     "undecide": "Back to waiting",
     "wontPrint": "Empty, so it will not print",
-    "phaseLine": "One phase a line: title | when | detail. Then a blank line and the schedule note."
+    "phaseLine": "One phase a line: title | when | detail. Then a blank line and the schedule note.",
+    "reason": {
+      "denied": "You are not signed in.",
+      "invalid": "The request was not in the shape expected.",
+      "no_database": "The database is not connected. Open Connections.",
+      "no_meeting": "This meeting no longer exists.",
+      "no_transcript": "There is no transcript yet. Send the pieces first.",
+      "no_dialogue": "The two speakers have not been told apart yet. Run that pass first.",
+      "over_ceiling": "That would take today or this month past its spending ceiling, so it was refused before it was sent. Raise the ceiling on the Settings page, or wait.",
+      "no_key": "The OpenRouter key is empty. Open Connections.",
+      "unreadable": "Twice in a row the model answered, but the answer could not be read as the shape asked for. Try again; if it keeps happening, the writer model on the Settings page may not be one that returns reliable JSON.",
+      "transport": "No answer came back from the model — not a bad one, none. A 429 beside this line means OpenRouter was busy, and pressing once more is usually enough. If it keeps happening, check the OpenRouter key and its remaining credit on the Connections page."
+    }
   },
   "pour": {
     "heading": "Into a proposal",

@@ -104,12 +104,25 @@ export type SeatAnswer = {
   ms: number;
 };
 
-/** One question to the seat's model. Throws only on transport; a refusal is a value. */
+export type SeatFailure = {
+  failed: true;
+  /** What went wrong, with the status in front when there was one — the ledger keeps this line. */
+  reason: string;
+  /** The HTTP status, or 0 for a dropped connection or a timeout. */
+  status: number;
+  retryAfterSeconds?: number;
+};
+
+/**
+ * One question to the seat's model. Never throws: a call that failed comes
+ * back as a value carrying its status, so the caller can ask the kernel
+ * whether it is worth another attempt — see `retry.ts`.
+ */
 export async function ask(
   seat: Seat,
   prompt: string,
   maxOutputTokens: number,
-): Promise<SeatAnswer | { failed: true; reason: string }> {
+): Promise<SeatAnswer | SeatFailure> {
   const messages: Message[] = [
     { role: "system", content: seat.system },
     { role: "user", content: prompt },
@@ -124,7 +137,14 @@ export async function ask(
     timeoutSeconds: Math.min(280, 90 + Math.ceil(prompt.length / 200)),
     responseFormat: "json_object",
   });
-  if (!answer.ok) return { failed: true, reason: answer.message };
+  if (!answer.ok) {
+    return {
+      failed: true,
+      status: answer.status,
+      retryAfterSeconds: answer.retryAfterSeconds,
+      reason: answer.status > 0 ? `HTTP ${answer.status}: ${answer.message}` : answer.message,
+    };
+  }
   return {
     text: answer.text,
     tokensIn: answer.tokensIn,
